@@ -25,7 +25,9 @@ export async function middleware(request: NextRequest) {
   // Refresh the session and gate the app behind login.
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
-  const isPublic = path.startsWith("/login") || path.startsWith("/auth");
+  // The mentor application is deliberately reachable without an account.
+  const isPublic =
+    path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/apply");
   if (!user && !isPublic) {
     const login = request.nextUrl.clone();
     login.pathname = "/login";

@@ -109,3 +109,29 @@ textarea:focus, input:focus, select:focus{outline:2px solid var(--teal); outline
 .checkgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:.3rem .8rem}
 .checkgrid label{display:flex; gap:.4rem; align-items:baseline; font-size:.85rem; text-transform:none; letter-spacing:0; font-weight:400; color:var(--ink)}
 .checkgrid input{width:auto}
+.checkgrid.wide{grid-template-columns:1fr; gap:.5rem}
+@media(min-width:640px){ .checkgrid.wide{grid-template-columns:1fr 1fr} }
+.checkline{display:flex; gap:.55rem; align-items:baseline; font-size:.88rem; color:var(--ink); text-transform:none; letter-spacing:0; font-weight:400; margin:0}
+.checkline input{width:auto; flex-shrink:0}
+.checkline .optdesc{display:block; font-style:normal; font-size:.79rem; color:var(--ink-faint); margin-top:.1rem}
+.fieldset{border:none; padding:0; margin:1.1rem 0}
+.fieldset legend{padding:0; font-size:.72rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:.3rem}
+.formrow .help{font-size:.82rem; color:var(--ink-faint); margin:.1rem 0 .45rem; text-transform:none; letter-spacing:0; font-weight:400}
+.rankgrid{display:grid; gap:.6rem}
+@media(min-width:640px){ .rankgrid{grid-template-columns:repeat(3,1fr)} }
+.rankgrid label{font-size:.7rem; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint); font-weight:700; display:block; margin-bottom:.2rem}
+.statement{background:var(--panel); border-radius:8px; padding:1rem 1.2rem; margin:1rem 0}
+.statement h3{margin:0 0 .6rem; font-size:1.05rem}
+.statement .stmt-h{margin:1rem 0 .3rem; font-size:.92rem; color:var(--ink)}
+.statement p{font-size:.9rem; color:var(--ink-soft); margin:0 0 .7rem}
+.statement ul{margin:.2rem 0 .8rem 1.2rem; font-size:.9rem}
+.public{padding-top:2.5rem}
+h1.page.big{font-size:1.9rem; line-height:1.2; text-wrap:balance}
+.lede{font-size:1.02rem; color:var(--ink-soft); margin:.4rem 0 .3rem}
+.btn.big{font-size:.95rem; padding:.7rem 1.6rem}
+.qcard{padding:.9rem 1.1rem}
+.qtop{display:flex; gap:.7rem; align-items:baseline; flex-wrap:wrap}
+.qtools{margin-left:auto; display:flex; gap:.7rem; align-items:baseline}
+.qtools button:disabled{opacity:.3; cursor:default}
+.qlabel{font-weight:700; margin-top:.45rem; color:var(--ink)}
+.cell-clip{max-width:18rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}

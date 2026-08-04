@@ -8,6 +8,11 @@ import { currentUser, homeForRole } from "@/lib/session";
 import { isDemo, supabaseServer } from "@/lib/supabase/server";
 import { getUser as demoGetUser } from "@/lib/store";
 import type { ImportRow } from "@/lib/csv";
+import {
+  acceptApplicant, addQuestion, deleteQuestion, getForm, moveQuestion,
+  saveMentorProfile, setApplicationStatus, submitApplication, updateFormCopy, updateQuestion,
+} from "@/lib/forms";
+import { slugifyKey, type FormQuestion, type QuestionType } from "@/lib/mentor-form";
 
 // ---- auth ----
 
@@ -153,6 +158,68 @@ export async function saveAvailability(formData: FormData) {
   const availability = String(formData.get("availability") ?? "").trim();
   const capacity = Math.min(10, Math.max(0, Number(formData.get("capacity") ?? 1)));
   await data.setAvailability(user.id, availability, capacity);
+  revalidatePath("/", "layout");
+  redirect("/mentor");
+}
+
+// ---- intake forms ----
+
+// Pulls one answer per question out of FormData, shaped by question type.
+function readAnswers(questions: FormQuestion[], formData: FormData) {
+  const answers: Record<string, unknown> = {};
+  const missing: string[] = [];
+  for (const q of questions) {
+    if (q.type === "statement") continue;
+    let value: unknown;
+    if (q.type === "multi_select") {
+      value = formData.getAll(q.key).map(String).filter(Boolean);
+      if (q.required && (value as string[]).length === 0) missing.push(q.label);
+    } else if (q.type === "ranked_select") {
+      const picks: string[] = [];
+      for (let i = 0; i < (q.maxSelect ?? 3); i++) {
+        const v = String(formData.get(`${q.key}__${i}`) ?? "").trim();
+        if (v && !picks.includes(v)) picks.push(v);
+      }
+      value = picks;
+      if (q.required && picks.length === 0) missing.push(q.label);
+    } else if (q.type === "consent") {
+      value = formData.get(q.key) === "yes";
+      if (q.required && value !== true) missing.push(q.label);
+    } else {
+      value = String(formData.get(q.key) ?? "").trim();
+      if (q.required && !value) missing.push(q.label);
+    }
+    answers[q.key] = value;
+  }
+  return { answers, missing };
+}
+
+export async function submitMentorApplication(formData: FormData) {
+  // Spam trap. Silently accept so a bot cannot tell it failed.
+  if (String(formData.get("website") ?? "")) redirect("/apply/thanks");
+
+  const form = await getForm("mentor-application");
+  if (!form) redirect("/apply?error=This form is not available right now");
+  const { answers, missing } = readAnswers(form.questions, formData);
+  if (missing.length) {
+    redirect(`/apply?error=${encodeURIComponent(`Still needed: ${missing.slice(0, 3).join(", ")}`)}`);
+  }
+  const a = answers as Record<string, string>;
+  const name = [a.first_name, a.last_name].filter(Boolean).join(" ").trim() || "Applicant";
+  await submitApplication("mentor-application", answers, name, (a.email ?? "").toLowerCase(), a.phone ?? "");
+  redirect("/apply/thanks");
+}
+
+export async function submitMentorProfile(formData: FormData) {
+  const user = await currentUser();
+  if (user.role !== "mentor") redirect("/");
+  const form = await getForm("mentor-profile");
+  if (!form) redirect("/");
+  const { answers, missing } = readAnswers(form.questions, formData);
+  if (missing.length) {
+    redirect(`/profile/setup?error=${encodeURIComponent(`Still needed: ${missing.slice(0, 3).join(", ")}`)}`);
+  }
+  await saveMentorProfile(user.id, answers);
   revalidatePath("/", "layout");
   redirect("/mentor");
 }
@@ -346,6 +413,142 @@ export async function importPeople(formData: FormData) {
 
   revalidatePath("/", "layout");
   redirect(`/admin/people?added=${encodeURIComponent(`${created} people imported, ${skipped} skipped`)}`);
+}
+
+// ---- form editor ----
+
+function parseOptions(raw: string) {
+  // One option per line. "label" or "label | description".
+  return raw.split("\n").map((l) => l.trim()).filter(Boolean).map((line) => {
+    const [label, description] = line.split("|").map((s) => s.trim());
+    return {
+      value: label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40),
+      label,
+      ...(description ? { description } : {}),
+    };
+  });
+}
+
+export async function createQuestion(formData: FormData) {
+  const admin = await requireAdmin();
+  const slug = String(formData.get("slug"));
+  const label = String(formData.get("label") ?? "").trim();
+  if (!label) redirect(`/admin/forms/${slug}?error=Give the question a label`);
+  const type = String(formData.get("type") ?? "short_text") as QuestionType;
+  const form = await getForm(slug);
+  const taken = (form?.questions ?? []).map((q) => q.key);
+  const key = slugifyKey(String(formData.get("key") ?? "") || label, taken);
+  const maxRaw = String(formData.get("maxSelect") ?? "").trim();
+
+  await addQuestion(slug, {
+    key,
+    section: String(formData.get("section") ?? "").trim() || "General",
+    type,
+    label,
+    help: String(formData.get("help") ?? "").trim() || undefined,
+    body: String(formData.get("body") ?? "").trim() || undefined,
+    options: parseOptions(String(formData.get("options") ?? "")),
+    required: formData.get("required") === "on",
+    maxSelect: maxRaw ? Number(maxRaw) : undefined,
+  });
+  await data.writeAudit({
+    actorId: admin.id, action: "form.question_added", subjectType: "form", subjectId: slug,
+    metadata: { key, type, label },
+  });
+  revalidatePath(`/admin/forms/${slug}`);
+  redirect(`/admin/forms/${slug}?added=${encodeURIComponent(label)}`);
+}
+
+export async function editQuestion(formData: FormData) {
+  const admin = await requireAdmin();
+  const slug = String(formData.get("slug"));
+  const id = String(formData.get("id"));
+  const patch: Partial<FormQuestion> = {
+    label: String(formData.get("label") ?? ""),
+    section: String(formData.get("section") ?? "General"),
+    help: String(formData.get("help") ?? ""),
+    body: String(formData.get("body") ?? ""),
+    required: formData.get("required") === "on",
+  };
+  const optionsRaw = String(formData.get("options") ?? "");
+  if (optionsRaw.trim()) patch.options = parseOptions(optionsRaw);
+  const maxRaw = String(formData.get("maxSelect") ?? "").trim();
+  if (maxRaw) patch.maxSelect = Number(maxRaw);
+
+  await updateQuestion(id, patch);
+  await data.writeAudit({
+    actorId: admin.id, action: "form.question_edited", subjectType: "form", subjectId: slug,
+    metadata: { id, label: patch.label },
+  });
+  revalidatePath(`/admin/forms/${slug}`);
+}
+
+export async function reorderQuestion(formData: FormData) {
+  await requireAdmin();
+  const slug = String(formData.get("slug"));
+  await moveQuestion(slug, String(formData.get("id")), Number(formData.get("dir")) as -1 | 1);
+  revalidatePath(`/admin/forms/${slug}`);
+}
+
+export async function removeQuestion(formData: FormData) {
+  const admin = await requireAdmin();
+  const slug = String(formData.get("slug"));
+  const id = String(formData.get("id"));
+  const permanent = formData.get("permanent") === "yes";
+  await deleteQuestion(id, permanent);
+  await data.writeAudit({
+    actorId: admin.id, action: permanent ? "form.question_deleted" : "form.question_archived",
+    subjectType: "form", subjectId: slug, metadata: { id },
+  });
+  revalidatePath(`/admin/forms/${slug}`);
+}
+
+export async function restoreQuestion(formData: FormData) {
+  await requireAdmin();
+  const slug = String(formData.get("slug"));
+  await updateQuestion(String(formData.get("id")), { archived: false });
+  revalidatePath(`/admin/forms/${slug}`);
+}
+
+export async function editFormCopy(formData: FormData) {
+  const admin = await requireAdmin();
+  const slug = String(formData.get("slug"));
+  await updateFormCopy(slug, {
+    introTitle: String(formData.get("introTitle") ?? ""),
+    introBody: String(formData.get("introBody") ?? ""),
+    introNote: String(formData.get("introNote") ?? ""),
+    closingTitle: String(formData.get("closingTitle") ?? ""),
+    closingBody: String(formData.get("closingBody") ?? ""),
+  });
+  await data.writeAudit({
+    actorId: admin.id, action: "form.copy_edited", subjectType: "form", subjectId: slug, metadata: {},
+  });
+  revalidatePath(`/admin/forms/${slug}`);
+}
+
+// ---- applicants ----
+
+export async function reviewApplicant(formData: FormData) {
+  const admin = await requireAdmin();
+  const id = String(formData.get("id"));
+  const status = String(formData.get("status")) as "new" | "reviewing" | "accepted" | "declined";
+  const note = String(formData.get("note") ?? "");
+
+  if (status === "accepted") {
+    const userId = await acceptApplicant(id, admin.id);
+    await data.writeAudit({
+      actorId: admin.id, action: "applicant.accepted", subjectType: "application", subjectId: id,
+      metadata: { userId },
+    });
+  } else {
+    await setApplicationStatus(id, status, admin.id, note);
+    await data.writeAudit({
+      actorId: admin.id, action: `applicant.${status}`, subjectType: "application", subjectId: id,
+      metadata: {},
+    });
+  }
+  revalidatePath("/admin/applicants");
+  redirect("/admin/applicants");
 }
 
 export async function markActionItem(formData: FormData) {
