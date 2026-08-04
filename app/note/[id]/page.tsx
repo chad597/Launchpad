@@ -3,7 +3,7 @@ import { currentUser } from "@/lib/session";
 import {
   actionItemsForPairing, getMeeting, getPairing, getUser, noteForMeeting,
 } from "@/lib/data";
-import { completeMentorHalf } from "../../actions";
+import { completeMentorHalf, submitFounderHalf } from "../../actions";
 
 const STATUS_LABEL = { on_track: "On track", at_risk: "At risk", off_track: "Off track" } as const;
 const STATUS_PILL = { on_track: "good", at_risk: "warn", off_track: "crit" } as const;
@@ -33,7 +33,10 @@ export default async function NotePage({ params }: { params: Promise<{ id: strin
   const priorItems = allItems.filter((a) => a.meetingId !== meeting.id);
   const people = new Map([[founder.id, founder], [mentor.id, mentor]]);
   const isMentor = user.id === mentor.id;
+  const isFounder = user.id === founder.id;
   const canFinish = isMentor && fs && !note?.mentorSubmittedAt;
+  const canWriteFounderHalf = isFounder && !note?.founderSubmittedAt;
+  const dueAt = new Date(new Date(meeting.scheduledAt).getTime() - 24 * 3600 * 1000);
 
   return (
     <div className="wrap narrow">
@@ -42,12 +45,66 @@ export default async function NotePage({ params }: { params: Promise<{ id: strin
         {founder.name} ({founder.company}) with {mentor.name} · {fmt(meeting.scheduledAt)} · Both of you see this whole note. No surprises on either side.
       </p>
 
+      {canWriteFounderHalf ? (
+        <form action={submitFounderHalf}>
+          <input type="hidden" name="meetingId" value={meeting.id} />
+          <div className="card" style={{ borderColor: "var(--teal)" }}>
+            <div className="half-head">
+              <h3>Your half</h3>
+              <span className="pill warn">Due {fmt(dueAt.toISOString())}</span>
+            </div>
+            <p className="meta" style={{ marginTop: 0 }}>
+              {mentor.name.split(" ")[0]} reads this before you meet, so the meeting can start as a conversation. Be honest rather than optimistic; a flat 7 every week helps no one.
+            </p>
+            {priorItems.length > 0 && (
+              <div className="formrow"><span className="label">Last meeting&rsquo;s action items</span>
+                <ul className="bare">
+                  {priorItems.map((a) => (
+                    <li key={a.id}>
+                      <label style={{ display: "inline", textTransform: "none", letterSpacing: 0, fontWeight: 400, fontSize: ".87rem", color: "var(--ink)" }}>
+                        <input type="checkbox" name="done" value={a.id} defaultChecked={a.status === "done"} style={{ width: "auto", marginRight: ".4rem" }} />
+                        {a.description} <span className="meta">({people.get(a.ownerId)?.name.split(" ")[0] ?? "…"}, due {a.dueDate})</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".8rem" }}>
+              <div className="formrow"><label htmlFor="statusFlag">Status</label>
+                <select id="statusFlag" name="statusFlag" defaultValue="on_track">
+                  <option value="on_track">On track</option>
+                  <option value="at_risk">At risk</option>
+                  <option value="off_track">Off track</option>
+                </select>
+              </div>
+              <div className="formrow"><label htmlFor="confidence">Confidence (1 to 10)</label>
+                <input type="text" inputMode="numeric" id="confidence" name="confidence" defaultValue="6" />
+              </div>
+            </div>
+            <div className="formrow"><label htmlFor="whatMoved">What moved (one per line)</label>
+              <textarea id="whatMoved" name="whatMoved" placeholder="What you actually did. Conversations had, tests run, things built." required />
+            </div>
+            <div className="formrow"><label htmlFor="changedThinking">What changed your thinking this week?</label>
+              <textarea id="changedThinking" name="changedThinking" placeholder="An assumption that broke, a pattern you noticed, a decision you now see differently." />
+            </div>
+            <div className="formrow"><label htmlFor="needHelp">Where I need help</label>
+              <textarea id="needHelp" name="needHelp" placeholder="One or two specific things tied to what this mentor knows." required />
+            </div>
+            <div className="formrow"><label htmlFor="focusNextWeek">My focus for next week (one per line)</label>
+              <textarea id="focusNextWeek" name="focusNextWeek" placeholder="Your best guess. Your mentor will confirm, sharpen, or redirect it." />
+            </div>
+            <button className="btn" type="submit">Share with {mentor.name.split(" ")[0]}</button>
+            <div className="notice">Once you share it, {mentor.name.split(" ")[0]} can read it and add their half. You&rsquo;ll both see the whole note.</div>
+          </div>
+        </form>
+      ) : (
       <div className="card">
         <div className="half-head">
           <h3>{founder.name.split(" ")[0]}&rsquo;s half</h3>
           {note?.founderSubmittedAt
             ? <span className="pill good">Submitted {fmt(note.founderSubmittedAt)}</span>
-            : <span className="pill warn">Due 24 hours before the meeting</span>}
+            : <span className="pill warn">Due {fmt(dueAt.toISOString())}</span>}
           {note?.statusFlag && <span className={`pill ${STATUS_PILL[note.statusFlag]}`}>{STATUS_LABEL[note.statusFlag]}</span>}
           {note?.confidence != null && <span className="pill info">Confidence {note.confidence} / 10</span>}
         </div>
@@ -79,6 +136,7 @@ export default async function NotePage({ params }: { params: Promise<{ id: strin
           <p className="meta" style={{ margin: 0 }}>Not submitted yet.</p>
         )}
       </div>
+      )}
 
       {canFinish ? (
         <form action={completeMentorHalf}>

@@ -109,15 +109,17 @@ export default async function MentorHome() {
           </div>
           <div className="card">
             <h2>Availability &amp; capacity</h2>
-            <p className="meta" style={{ margin: "0 0 .5rem" }}>1:1 windows: Tue and Thu afternoons · Capacity {views.length} of 2 founders</p>
-            <button className="btn ghost">Edit availability</button>
+            <p className="meta" style={{ margin: "0 0 .5rem" }}>
+              {user.availability ? `Usually free: ${user.availability}` : "No availability set yet"} · {views.length} of {user.capacity ?? 2} founders
+            </p>
+            <Link className="btn ghost" href="/mentor/availability">Edit availability</Link>
           </div>
           <div className="card">
             <h2>Seeing a pattern?</h2>
             <p className="meta" style={{ margin: "0 0 .6rem" }}>
               If the same risk keeps showing up across founders, or a match isn&rsquo;t clicking, tell us. You don&rsquo;t need to manage it alone.
             </p>
-            <button className="btn ghost">Flag to the Launchpad team</button>
+            <Link className="btn ghost" href="/flag">Flag to the Launchpad team</Link>
           </div>
         </div>
       </div>

@@ -8,8 +8,8 @@ import {
 } from "./fixtures";
 import { computePairHealth, healthRank } from "./health";
 import type {
-  ActionItem, Flag, MatchSuggestion, Meeting, MeetingNote, MentorSection,
-  Message, PairHealth, Pairing, User,
+  ActionItem, Flag, FounderSection, MatchSuggestion, Meeting, MeetingNote,
+  MentorSection, Message, PairHealth, Pairing, StatusFlag, User,
 } from "./types";
 
 interface Store {
@@ -171,6 +171,51 @@ export function submitMentorHalf(
       description: a.description, ownerId: a.ownerId, dueDate: a.dueDate, status: "open",
     });
   }
+}
+
+export function submitFounderHalf(
+  meetingId: string,
+  section: FounderSection,
+  statusFlag: StatusFlag,
+  confidence: number
+) {
+  const s = store();
+  let note = s.notes.find((n) => n.meetingId === meetingId);
+  if (!note) {
+    note = {
+      id: `n-${Date.now()}`, meetingId, statusFlag: null, confidence: null,
+      founderSection: null, mentorSection: null, keyInsight: null,
+      decisionMade: null, founderSubmittedAt: null, mentorSubmittedAt: null,
+    };
+    s.notes.push(note);
+  }
+  note.founderSection = section;
+  note.statusFlag = statusFlag;
+  note.confidence = confidence;
+  note.founderSubmittedAt = new Date().toISOString();
+}
+
+export function createMeeting(pairingId: string, scheduledAt: string, weekNo: number) {
+  const id = `m-${Date.now()}`;
+  store().meetings.push({ id, pairingId, scheduledAt, status: "scheduled", weekNumber: weekNo });
+  return id;
+}
+
+export function raiseFlag(
+  raisedById: string,
+  pairingId: string | null,
+  category: Flag["category"],
+  body: string
+) {
+  store().flags.push({
+    id: `f-${Date.now()}`, raisedById, pairingId, category, body,
+    status: "open", createdAt: new Date().toISOString(),
+  });
+}
+
+export function setAvailability(userId: string, availability: string, capacity: number) {
+  const u = store().users.find((x) => x.id === userId);
+  if (u) { u.availability = availability; u.capacity = capacity; }
 }
 
 export function toggleActionItem(id: string) {

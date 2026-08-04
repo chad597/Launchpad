@@ -4,8 +4,8 @@
 import { supabaseServer } from "./supabase/server";
 import { computePairHealth, healthRank } from "./health";
 import type {
-  ActionItem, Cohort, Flag, MatchSuggestion, Meeting, MeetingNote, MentorSection,
-  Message, PairHealth, Pairing, User,
+  ActionItem, Cohort, Flag, FounderSection, MatchSuggestion, Meeting, MeetingNote,
+  MentorSection, Message, PairHealth, Pairing, StatusFlag, User,
 } from "./types";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -15,6 +15,8 @@ function mapUser(r: any): User {
     id: r.id, email: r.email, name: r.name, role: r.role,
     company: r.company ?? undefined, stage: r.stage ?? undefined,
     bio: r.bio ?? undefined, expertise: r.expertise ?? undefined,
+    availability: r.availability ?? undefined, bookingLink: r.booking_link ?? undefined,
+    capacity: r.capacity ?? undefined,
   };
 }
 
@@ -248,6 +250,52 @@ export async function submitMentorHalf(
       description: a.description, owner_id: a.ownerId, due_date: a.dueDate || null,
     }));
   if (rows.length) await sb.from("action_items").insert(rows);
+}
+
+export async function submitFounderHalf(
+  meetingId: string,
+  section: FounderSection,
+  statusFlag: StatusFlag,
+  confidence: number
+) {
+  const sb = await supabaseServer();
+  await sb.from("meeting_notes").upsert(
+    {
+      meeting_id: meetingId,
+      founder_section: section,
+      status_flag: statusFlag,
+      confidence,
+      founder_submitted_at: new Date().toISOString(),
+    },
+    { onConflict: "meeting_id" }
+  );
+}
+
+export async function createMeeting(pairingId: string, scheduledAt: string, weekNo: number) {
+  const sb = await supabaseServer();
+  const { data } = await sb
+    .from("meetings")
+    .insert({ pairing_id: pairingId, scheduled_at: scheduledAt, status: "scheduled", week_number: weekNo })
+    .select("id")
+    .maybeSingle();
+  return data?.id ?? "";
+}
+
+export async function raiseFlag(
+  raisedById: string,
+  pairingId: string | null,
+  category: Flag["category"],
+  body: string
+) {
+  const sb = await supabaseServer();
+  await sb.from("flags").insert({
+    raised_by: raisedById, pairing_id: pairingId, category, body, status: "open",
+  });
+}
+
+export async function setAvailability(userId: string, availability: string, capacity: number) {
+  const sb = await supabaseServer();
+  await sb.from("users").update({ availability, capacity }).eq("id", userId);
 }
 
 export async function toggleActionItem(id: string) {

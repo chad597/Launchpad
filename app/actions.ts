@@ -87,6 +87,75 @@ export async function completeMentorHalf(formData: FormData) {
   redirect(`/note/${meetingId}`);
 }
 
+export async function submitFounderHalf(formData: FormData) {
+  const user = await currentUser();
+  const meetingId = String(formData.get("meetingId"));
+  const meeting = await data.getMeeting(meetingId);
+  if (!meeting) return;
+  const pairing = await data.getPairing(meeting.pairingId);
+  if (!pairing || pairing.founderId !== user.id) return;
+
+  const lines = (k: string) =>
+    String(formData.get(k) ?? "").split("\n").map((s) => s.trim()).filter(Boolean);
+  const statusFlag = String(formData.get("statusFlag") ?? "on_track") as
+    | "on_track" | "at_risk" | "off_track";
+  const confidence = Math.min(10, Math.max(1, Number(formData.get("confidence") ?? 5)));
+
+  await data.submitFounderHalf(
+    meetingId,
+    {
+      actionItemCheckIds: formData.getAll("done").map(String),
+      whatMoved: lines("whatMoved"),
+      whatChangedMyThinking: String(formData.get("changedThinking") ?? ""),
+      whereINeedHelp: String(formData.get("needHelp") ?? ""),
+      focusNextWeek: lines("focusNextWeek"),
+    },
+    statusFlag,
+    confidence
+  );
+  revalidatePath("/", "layout");
+  redirect(`/note/${meetingId}`);
+}
+
+export async function bookMeeting(formData: FormData) {
+  const user = await currentUser();
+  const pairingId = String(formData.get("pairingId"));
+  const when = String(formData.get("scheduledAt") ?? "");
+  const pairing = await data.getPairing(pairingId);
+  if (!pairing || (pairing.founderId !== user.id && pairing.mentorId !== user.id)) return;
+  if (!when) redirect("/founder?error=Pick a date and time");
+
+  const cohort = await data.getCohort();
+  const start = new Date(cohort.startDate + "T00:00:00.000Z").getTime();
+  const at = new Date(when);
+  const weekNo = Math.max(1, Math.floor((at.getTime() - start) / (7 * 24 * 3600 * 1000)) + 1);
+  await data.createMeeting(pairingId, at.toISOString(), weekNo);
+  revalidatePath("/", "layout");
+  redirect(homeForRole(user.role));
+}
+
+export async function submitFlag(formData: FormData) {
+  const user = await currentUser();
+  const body = String(formData.get("body") ?? "").trim();
+  if (!body) redirect("/flag?error=Tell us what is going on");
+  const category = String(formData.get("category") ?? "other") as
+    | "pattern_risk" | "match_not_working" | "conduct" | "other";
+  const pairingId = String(formData.get("pairingId") ?? "") || null;
+  await data.raiseFlag(user.id, pairingId, category, body);
+  revalidatePath("/admin");
+  redirect("/flag?sent=1");
+}
+
+export async function saveAvailability(formData: FormData) {
+  const user = await currentUser();
+  if (user.role !== "mentor") return;
+  const availability = String(formData.get("availability") ?? "").trim();
+  const capacity = Math.min(10, Math.max(0, Number(formData.get("capacity") ?? 1)));
+  await data.setAvailability(user.id, availability, capacity);
+  revalidatePath("/", "layout");
+  redirect("/mentor");
+}
+
 export async function markActionItem(formData: FormData) {
   const user = await currentUser();
   const id = String(formData.get("id"));

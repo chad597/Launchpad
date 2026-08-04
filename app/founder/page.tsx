@@ -4,7 +4,7 @@ import {
   actionItemsForPairing, currentTime, getUser, messagesForPairing,
   meetingsForPairing, nextMeetingForPairing, noteForMeeting, pairingsForUser,
 } from "@/lib/data";
-import { markActionItem } from "../actions";
+import { bookMeeting, markActionItem } from "../actions";
 
 function fmt(dt: string) {
   return new Date(dt).toLocaleString("en-US", {
@@ -64,7 +64,22 @@ export default async function FounderHome() {
                 <div className="notice">{mentor.name.split(" ")[0]} reads your note before you meet, so the time goes to the conversation instead of a recap.</div>
               </>
             ) : (
-              <button className="btn">Book a meeting</button>
+              <>
+                <p className="meta" style={{ marginTop: 0 }}>
+                  {mentor.availability
+                    ? <>{mentor.name.split(" ")[0]} is usually free: {mentor.availability}.</>
+                    : <>Pick a time that works for you both.</>}
+                </p>
+                <form action={bookMeeting}>
+                  <input type="hidden" name="pairingId" value={pairing.id} />
+                  <div className="formrow">
+                    <label htmlFor="scheduledAt">Date and time</label>
+                    <input type="datetime-local" id="scheduledAt" name="scheduledAt" required />
+                  </div>
+                  <button className="btn" type="submit">Book this meeting</button>
+                </form>
+                <div className="notice">Booking it sets your note deadline 24 hours before the meeting, so you both walk in prepared.</div>
+              </>
             )}
             <hr className="divider" />
             <h2>Your action items</h2>
@@ -133,7 +148,7 @@ export default async function FounderHome() {
             <a className="btn ghost" href="#">Ask-A-Mentor</a>{" "}
             <a className="btn ghost" href="#">Office hours</a>
             <hr className="divider" />
-            <button className="linklike">Something not working with your match? Tell the Launchpad team</button>
+            <Link className="linklike" href="/flag">Something not working with your match? Tell the Launchpad team</Link>
           </div>
         </div>
       </div>

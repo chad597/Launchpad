@@ -4,8 +4,8 @@ import { isDemo } from "./supabase/server";
 import * as demo from "./store";
 import * as db from "./db";
 import type {
-  ActionItem, Cohort, Flag, MatchSuggestion, Meeting, MeetingNote, MentorSection,
-  Message, PairHealth, Pairing, User,
+  ActionItem, Cohort, Flag, FounderSection, MatchSuggestion, Meeting, MeetingNote,
+  MentorSection, Message, PairHealth, Pairing, StatusFlag, User,
 } from "./types";
 
 export async function getUser(id: string): Promise<User | undefined> {
@@ -68,6 +68,24 @@ export async function submitMentorHalf(
   return isDemo()
     ? demo.submitMentorHalf(meetingId, section, outcomes)
     : db.submitMentorHalf(meetingId, section, outcomes);
+}
+export async function submitFounderHalf(
+  meetingId: string, section: FounderSection, statusFlag: StatusFlag, confidence: number
+) {
+  return isDemo()
+    ? demo.submitFounderHalf(meetingId, section, statusFlag, confidence)
+    : db.submitFounderHalf(meetingId, section, statusFlag, confidence);
+}
+export async function createMeeting(pairingId: string, scheduledAt: string, weekNo: number) {
+  return isDemo() ? demo.createMeeting(pairingId, scheduledAt, weekNo) : db.createMeeting(pairingId, scheduledAt, weekNo);
+}
+export async function raiseFlag(
+  raisedById: string, pairingId: string | null, category: Flag["category"], body: string
+) {
+  return isDemo() ? demo.raiseFlag(raisedById, pairingId, category, body) : db.raiseFlag(raisedById, pairingId, category, body);
+}
+export async function setAvailability(userId: string, availability: string, capacity: number) {
+  return isDemo() ? demo.setAvailability(userId, availability, capacity) : db.setAvailability(userId, availability, capacity);
 }
 export async function toggleActionItem(id: string) {
   return isDemo() ? demo.toggleActionItem(id) : db.toggleActionItem(id);

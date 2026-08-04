@@ -14,6 +14,9 @@ export interface User {
   stage?: string;
   bio?: string;
   expertise?: string[];
+  availability?: string;
+  bookingLink?: string;
+  capacity?: number;
 }
 
 export interface Cohort {
