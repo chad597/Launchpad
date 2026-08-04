@@ -153,6 +153,6 @@ export async function toggleActionItem(id: string) {
 export async function resolveFlag(id: string) {
   return isDemo() ? demo.resolveFlag(id) : db.resolveFlag(id);
 }
-export async function confirmMatch(suggestionId: string) {
+export async function confirmMatch(suggestionId: string): Promise<Pairing | null> {
   return isDemo() ? demo.confirmMatch(suggestionId) : db.confirmMatch(suggestionId);
 }

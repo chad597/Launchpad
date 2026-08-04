@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import "./globals.css";
 import { DEMO_IDENTITIES } from "@/lib/session";
 import { isDemo } from "@/lib/supabase/server";
@@ -33,7 +34,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     const week = await weekNumber();
     bar = (
       <div className="appbar">
-        <div className="logo"><span className="mark" />LAUNCHPAD</div>
+        <Link className="logo" href="/" aria-label="Back to your dashboard">
+          <span className="mark" />LAUNCHPAD
+        </Link>
         <div className="who">
           <span>{cohort.ecosystem} · {cohort.name} · Week {week} of 12</span>
           <b>{user.name}</b>

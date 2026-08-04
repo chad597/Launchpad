@@ -351,19 +351,25 @@ export function resolveFlag(id: string) {
   if (f) f.status = "resolved";
 }
 
-export function confirmMatch(suggestionId: string) {
+// Returns the pairing it created, so the caller can introduce the right two
+// people rather than guessing which of a founder's pairings is the new one.
+export function confirmMatch(suggestionId: string): Pairing | null {
   const s = store();
   const sug = s.suggestions.find((x) => x.id === suggestionId);
-  if (!sug) return;
+  if (!sug) return null;
   sug.status = "selected";
   for (const other of s.suggestions) {
     if (other.founderId === sug.founderId && other.id !== sug.id) other.status = "rejected";
   }
-  const old = s.pairings.find((p) => p.founderId === sug.founderId && p.status === "active");
-  if (old) {
-    old.status = "dissolved";
+  // Only the pairing this suggestion replaces is dissolved. A founder may
+  // legitimately hold a second mentor, and that one is left alone.
+  const replaced = s.pairings.find(
+    (p) => p.founderId === sug.founderId && p.status === "active" && p.mentorId !== sug.mentorId
+  );
+  if (replaced && s.pairings.filter((p) => p.founderId === sug.founderId && p.status === "active").length === 1) {
+    replaced.status = "dissolved";
   }
-  s.pairings.push({
+  const created: Pairing = {
     id: `p-${Date.now()}`,
     cohortId: getCohort().id,
     founderId: sug.founderId,
@@ -371,5 +377,7 @@ export function confirmMatch(suggestionId: string) {
     status: "active",
     declaredCadence: "biweekly",
     matchRationale: sug.rationale,
-  });
+  };
+  s.pairings.push(created);
+  return created;
 }

@@ -18,6 +18,9 @@ export async function currentUser(): Promise<User> {
   }
   const user = await getUserByAuth();
   if (!user) redirect("/login");
+  // Deactivating an account has to actually remove access, not just hide the
+  // person from admin lists.
+  if (user.status === "inactive") redirect("/login?error=This account is no longer active");
   return user;
 }
 

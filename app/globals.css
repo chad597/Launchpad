@@ -25,7 +25,7 @@ body{
 }
 a{color:var(--teal-text)}
 .appbar{display:flex; align-items:center; gap:.75rem; padding:.85rem 1.25rem; background:var(--card); border-bottom:1px solid var(--line); flex-wrap:wrap}
-.logo{display:flex; align-items:center; gap:.55rem; font-weight:700; letter-spacing:.12em; font-size:.85rem}
+.logo{display:flex; align-items:center; gap:.55rem; font-weight:700; letter-spacing:.12em; font-size:.85rem; color:var(--ink); text-decoration:none}
 .mark{width:22px; height:22px; position:relative; display:inline-block}
 .mark::before{content:""; position:absolute; inset:0; background:var(--orange); clip-path:polygon(50% 0, 100% 55%, 78% 55%, 78% 100%, 62% 82%, 50% 100%, 38% 82%, 22% 100%, 22% 55%, 0 55%)}
 .who{margin-left:auto; font-size:.8rem; color:var(--ink-faint); display:flex; gap:.6rem; align-items:center; flex-wrap:wrap}

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { currentUser } from "@/lib/session";
 import {
-  actionItemsForPairing, getMeeting, getPairing, getUser, noteForMeeting,
+  actionItemsForPairing, getMeeting, getPairing, getUser, meetingsForPairing, noteForMeeting,
 } from "@/lib/data";
 import { completeMentorHalf, submitFounderHalf } from "../../actions";
 
@@ -14,8 +14,14 @@ function fmt(dt: string) {
   });
 }
 
-export default async function NotePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function NotePage({
+  params, searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
   const { id } = await params;
+  const { error } = await searchParams;
   const user = await currentUser();
   const meeting = await getMeeting(id);
   if (!meeting) notFound();
@@ -28,9 +34,28 @@ export default async function NotePage({ params }: { params: Promise<{ id: strin
     actionItemsForPairing(pairing.id),
   ]);
   if (!founder || !mentor) notFound();
+
+  // A meeting note is private to the pair and program staff. Instructors are
+  // deliberately included here (they own cohort quality) but never in messages.
+  const isMember = user.id === founder.id || user.id === mentor.id;
+  const isStaff = user.role === "admin" || user.role === "instructor";
+  if (!isMember && !isStaff) {
+    return (
+      <div className="wrap narrow">
+        <p className="meta">This meeting note is private to the pair and program staff.</p>
+      </div>
+    );
+  }
+
   const fs = note?.founderSection ?? null;
   const ms = note?.mentorSection ?? null;
-  const priorItems = allItems.filter((a) => a.meetingId !== meeting.id);
+  // Items agreed at *earlier* meetings. Filtering only on "not this meeting"
+  // pulled in items from future meetings too.
+  const pairMeetings = await meetingsForPairing(pairing.id);
+  const earlier = new Set(
+    pairMeetings.filter((m) => m.scheduledAt < meeting.scheduledAt).map((m) => m.id)
+  );
+  const priorItems = allItems.filter((a) => earlier.has(a.meetingId));
   const people = new Map([[founder.id, founder], [mentor.id, mentor]]);
   const isMentor = user.id === mentor.id;
   const isFounder = user.id === founder.id;
@@ -44,6 +69,7 @@ export default async function NotePage({ params }: { params: Promise<{ id: strin
       <p className="sub">
         {founder.name} ({founder.company}) with {mentor.name} · {fmt(meeting.scheduledAt)} · Both of you see this whole note. No surprises on either side.
       </p>
+      {error && <div className="banner bad">{error}</div>}
 
       {canWriteFounderHalf ? (
         <form action={submitFounderHalf}>
@@ -101,7 +127,7 @@ export default async function NotePage({ params }: { params: Promise<{ id: strin
       ) : (
       <div className="card">
         <div className="half-head">
-          <h3>{founder.name.split(" ")[0]}&rsquo;s half</h3>
+          <h3>{isFounder ? "Your half" : `${founder.name.split(" ")[0]}’s half`}</h3>
           {note?.founderSubmittedAt
             ? <span className="pill good">Submitted {fmt(note.founderSubmittedAt)}</span>
             : <span className="pill warn">Due {fmt(dueAt.toISOString())}</span>}

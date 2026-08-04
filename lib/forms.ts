@@ -208,21 +208,24 @@ export async function updateFormCopy(slug: string, patch: Partial<FormDefinition
 
 // ---- submissions ----
 
+// Returns the new application id. The caller is anonymous and cannot read the
+// applications table back, so the insert has to hand the id over directly.
 export async function submitApplication(
   slug: string, answers: Record<string, unknown>, name: string, email: string, phone: string
-) {
+): Promise<string> {
   if (isDemo()) {
+    const id = `app-${Date.now()}`;
     mem().applications.unshift({
-      id: `app-${Date.now()}`, name, email, phone, answers,
-      status: "new", submittedAt: new Date().toISOString(),
+      id, name, email, phone, answers, status: "new", submittedAt: new Date().toISOString(),
     });
-    return;
+    return id;
   }
   const sb = await supabaseServer();
   const formId = await formIdFor(slug);
-  await sb.from("mentor_applications").insert({
+  const { data } = await sb.from("mentor_applications").insert({
     form_id: formId, name, email, phone, answers, status: "new",
-  });
+  }).select("id").maybeSingle();
+  return data?.id ?? "";
 }
 
 export async function listApplications(status?: string): Promise<Application[]> {

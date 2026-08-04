@@ -37,7 +37,7 @@ export default async function ApplicantsPage({
 
   return (
     <div className="wrap">
-      <AdminNav current="/admin/applicants" />
+      <AdminNav current="/admin/applicants" role={user.role} />
       <h1 className="page">Potential mentors</h1>
       <p className="sub">
         Everyone who has applied at <code>/apply</code>. Accepting someone creates their mentor account and sends them to the profile form at first sign-in.

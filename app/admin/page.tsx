@@ -41,7 +41,7 @@ export default async function AdminHome() {
 
   return (
     <div className="wrap">
-      <AdminNav current="/admin" />
+      <AdminNav current="/admin" role={user.role} />
       <h1 className="page">{cohort.ecosystem} · {cohort.name}</h1>
       <p className="sub">Week {week} of 12 · {board.length} active pairings · started {fmtDay(cohort.startDate + "T12:00:00Z")}</p>
 

@@ -3,7 +3,10 @@ import { getFormForEditing, listApplications } from "@/lib/forms";
 import { answerToText } from "@/lib/mentor-form";
 
 function cell(v: string) {
-  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  // Applicants write free text, so a leading =, +, -, or @ would be executed
+  // as a formula when the admin opens the file in Excel or Sheets.
+  const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
 // One column per question, including questions since removed, so an export

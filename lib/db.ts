@@ -465,20 +465,30 @@ export async function resolveFlag(id: string) {
   await sb.from("flags").update({ status: "resolved", resolved_at: new Date().toISOString() }).eq("id", id);
 }
 
-export async function confirmMatch(suggestionId: string) {
+// Returns the pairing it created, so the caller introduces the right two people.
+export async function confirmMatch(suggestionId: string): Promise<Pairing | null> {
   const sb = await supabaseServer();
   const { data: sugRow } = await sb.from("match_suggestions").select("*").eq("id", suggestionId).maybeSingle();
-  if (!sugRow) return;
+  if (!sugRow) return null;
   const sug = mapSuggestion(sugRow);
   const cohort = await getCohort();
   await sb.from("match_suggestions").update({ status: "selected" }).eq("id", suggestionId);
   await sb.from("match_suggestions").update({ status: "rejected" })
     .eq("founder_id", sug.founderId).neq("id", suggestionId).eq("status", "suggested");
-  await sb.from("pairings").update({ status: "dissolved", ended_at: new Date().toISOString(), end_reason: "rematched" })
-    .eq("founder_id", sug.founderId).eq("status", "active");
-  await sb.from("pairings").insert({
+
+  // Dissolve the pairing this replaces, but never a legitimate second mentor.
+  const { data: current } = await sb
+    .from("pairings").select("id").eq("founder_id", sug.founderId).eq("status", "active");
+  if ((current ?? []).length === 1) {
+    await sb.from("pairings")
+      .update({ status: "dissolved", ended_at: new Date().toISOString(), end_reason: "rematched" })
+      .eq("id", current![0].id);
+  }
+
+  const { data: created } = await sb.from("pairings").insert({
     cohort_id: cohort.id, founder_id: sug.founderId, mentor_id: sug.mentorId,
     status: "active", declared_cadence: "biweekly", match_rationale: sug.rationale,
     started_at: new Date().toISOString(),
-  });
+  }).select("*").maybeSingle();
+  return created ? mapPairing(created) : null;
 }

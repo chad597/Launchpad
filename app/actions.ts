@@ -16,7 +16,10 @@ import {
 import {
   emailAccepted, emailAdminNewApplication, emailApplicationReceived, emailDeclined, emailMatchIntro,
 } from "@/lib/email";
-import { slugifyKey, type FormQuestion, type QuestionType } from "@/lib/mentor-form";
+import { getFormForEditing } from "@/lib/forms";
+import {
+  slugifyKey, type FormQuestion, type QuestionOption, type QuestionType,
+} from "@/lib/mentor-form";
 
 // ---- auth ----
 
@@ -27,9 +30,11 @@ export async function signIn(formData: FormData) {
   const h = await headers();
   const origin = h.get("origin") ?? h.get("x-forwarded-host") ?? "";
   const base = origin.startsWith("http") ? origin : `https://${origin}`;
+  // Only people the program has already added may sign in. Without this,
+  // any stranger could create a session against the public anon key.
   const { error } = await sb.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: `${base}/auth/callback` },
+    options: { emailRedirectTo: `${base}/auth/callback`, shouldCreateUser: false },
   });
   if (error) redirect(`/login?error=${encodeURIComponent(error.message)}`);
   redirect("/login?sent=1");
@@ -107,22 +112,46 @@ export async function submitFounderHalf(formData: FormData) {
 
   const lines = (k: string) =>
     String(formData.get(k) ?? "").split("\n").map((s) => s.trim()).filter(Boolean);
-  const statusFlag = String(formData.get("statusFlag") ?? "on_track") as
-    | "on_track" | "at_risk" | "off_track";
-  const confidence = Math.min(10, Math.max(1, Number(formData.get("confidence") ?? 5)));
+  const raw = String(formData.get("statusFlag") ?? "on_track");
+  const statusFlag = (["on_track", "at_risk", "off_track"].includes(raw) ? raw : "on_track") as
+    "on_track" | "at_risk" | "off_track";
 
+  // Number("eight") is NaN, and Math.min/max propagate it rather than clamping.
+  const parsed = Number(formData.get("confidence"));
+  const confidence = Number.isFinite(parsed) ? Math.min(10, Math.max(1, Math.round(parsed))) : 5;
+
+  const whatMoved = lines("whatMoved");
+  const needHelp = String(formData.get("needHelp") ?? "").trim();
+  const missing: string[] = [];
+  if (!whatMoved.length) missing.push("what moved");
+  if (!needHelp) missing.push("where you need help");
+  if (missing.length) {
+    redirect(`/note/${meetingId}?error=${encodeURIComponent(`Still needed: ${missing.join(" and ")}`)}`);
+  }
+
+  const doneIds = formData.getAll("done").map(String);
   await data.submitFounderHalf(
     meetingId,
     {
-      actionItemCheckIds: formData.getAll("done").map(String),
-      whatMoved: lines("whatMoved"),
-      whatChangedMyThinking: String(formData.get("changedThinking") ?? ""),
-      whereINeedHelp: String(formData.get("needHelp") ?? ""),
+      actionItemCheckIds: doneIds,
+      whatMoved,
+      whatChangedMyThinking: String(formData.get("changedThinking") ?? "").trim(),
+      whereINeedHelp: needHelp,
       focusNextWeek: lines("focusNextWeek"),
     },
     statusFlag,
     confidence
   );
+
+  // The checkboxes are the founder saying "I did these", so they have to
+  // actually move the action items, not just be recorded on the note.
+  const prior = (await data.actionItemsForPairing(pairing.id))
+    .filter((a) => a.meetingId !== meetingId);
+  for (const item of prior) {
+    const shouldBeDone = doneIds.includes(item.id);
+    if (shouldBeDone !== (item.status === "done")) await data.toggleActionItem(item.id);
+  }
+
   revalidatePath("/", "layout");
   redirect(`/note/${meetingId}`);
 }
@@ -133,11 +162,18 @@ export async function bookMeeting(formData: FormData) {
   const when = String(formData.get("scheduledAt") ?? "");
   const pairing = await data.getPairing(pairingId);
   if (!pairing || (pairing.founderId !== user.id && pairing.mentorId !== user.id)) return;
-  if (!when) redirect("/founder?error=Pick a date and time");
+  const home = homeForRole(user.role);
+  if (!when) redirect(`${home}?error=Pick a date and time`);
+
+  // The picker sends a bare "2026-08-20T09:00" with no zone. Parsing that with
+  // new Date() uses the server's zone, so on Vercel (UTC) a 9am booking would
+  // land at 5am for everyone. Anchor it to the program's timezone instead.
+  const at = new Date(`${when}:00${easternOffset(when)}`);
+  if (!Number.isFinite(at.getTime())) redirect(`${home}?error=That date did not look right`);
+  if (at.getTime() < Date.now()) redirect(`${home}?error=Pick a time in the future`);
 
   const cohort = await data.getCohort();
   const start = new Date(cohort.startDate + "T00:00:00.000Z").getTime();
-  const at = new Date(when);
   const weekNo = Math.max(1, Math.floor((at.getTime() - start) / (7 * 24 * 3600 * 1000)) + 1);
   await data.createMeeting(pairingId, at.toISOString(), weekNo);
   revalidatePath("/", "layout");
@@ -148,9 +184,16 @@ export async function submitFlag(formData: FormData) {
   const user = await currentUser();
   const body = String(formData.get("body") ?? "").trim();
   if (!body) redirect("/flag?error=Tell us what is going on");
-  const category = String(formData.get("category") ?? "other") as
-    | "pattern_risk" | "match_not_working" | "conduct" | "other";
-  const pairingId = String(formData.get("pairingId") ?? "") || null;
+  const rawCat = String(formData.get("category") ?? "other");
+  const category = (["pattern_risk", "match_not_working", "conduct", "other"].includes(rawCat)
+    ? rawCat : "other") as "pattern_risk" | "match_not_working" | "conduct" | "other";
+
+  // You may only attach a flag to a pairing you are part of.
+  let pairingId = String(formData.get("pairingId") ?? "") || null;
+  if (pairingId) {
+    const p = await data.getPairing(pairingId);
+    if (!p || (p.founderId !== user.id && p.mentorId !== user.id)) pairingId = null;
+  }
   await data.raiseFlag(user.id, pairingId, category, body);
   revalidatePath("/admin");
   redirect("/flag?sent=1");
@@ -164,6 +207,23 @@ export async function saveAvailability(formData: FormData) {
   await data.setAvailability(user.id, availability, capacity);
   revalidatePath("/", "layout");
   redirect("/mentor");
+}
+
+// US Eastern is UTC-4 from the second Sunday in March to the first Sunday in
+// November, and UTC-5 otherwise. The program runs on Eastern time.
+function easternOffset(local: string): string {
+  const d = new Date(`${local}:00Z`);
+  const year = d.getUTCFullYear();
+  const secondSundayMarch = nthSunday(year, 2, 2);
+  const firstSundayNovember = nthSunday(year, 10, 1);
+  const t = d.getTime();
+  return t >= secondSundayMarch && t < firstSundayNovember ? "-04:00" : "-05:00";
+}
+
+function nthSunday(year: number, monthIndex: number, n: number): number {
+  const first = new Date(Date.UTC(year, monthIndex, 1));
+  const offset = (7 - first.getUTCDay()) % 7;
+  return Date.UTC(year, monthIndex, 1 + offset + (n - 1) * 7, 7); // 2am local
 }
 
 // ---- intake forms ----
@@ -211,15 +271,12 @@ export async function submitMentorApplication(formData: FormData) {
   const a = answers as Record<string, string>;
   const name = [a.first_name, a.last_name].filter(Boolean).join(" ").trim() || "Applicant";
   const email = (a.email ?? "").toLowerCase();
-  await submitApplication("mentor-application", answers, name, email, a.phone ?? "");
+  const appId = await submitApplication("mentor-application", answers, name, email, a.phone ?? "");
 
   // Best effort: a failed email must not lose the application.
   await emailApplicationReceived(email, a.first_name || name);
   const adminTo = process.env.ADMIN_EMAIL;
-  if (adminTo) {
-    const latest = (await listApplications()).find((x) => x.email === email);
-    await emailAdminNewApplication(adminTo, name, latest?.id ?? "");
-  }
+  if (adminTo) await emailAdminNewApplication(adminTo, name, appId);
   redirect("/apply/thanks");
 }
 
@@ -255,6 +312,13 @@ export async function addPerson(formData: FormData) {
   const expertise = String(formData.get("expertise") ?? "")
     .split(",").map((s) => s.trim()).filter(Boolean);
 
+  // Email is unique in the database, so a duplicate would otherwise fail
+  // silently and still report success.
+  const clash = (await data.listUsers()).find((u) => u.email.toLowerCase() === email);
+  if (clash) {
+    redirect(`/admin/people?error=${encodeURIComponent(`${clash.name} already uses ${email}`)}`);
+  }
+
   const id = await data.createUser({
     email, name, role,
     company: String(formData.get("company") ?? "") || undefined,
@@ -276,7 +340,11 @@ export async function changeRole(formData: FormData) {
   const role = String(formData.get("role")) as "founder" | "mentor" | "instructor" | "admin";
   const before = await data.getUser(id);
   if (!before || before.role === role) return;
-  // Never let the last admin demote themselves out of the system.
+  // Changing your own role locks you out with no way back.
+  if (id === admin.id) {
+    redirect("/admin/people?error=Ask another admin to change your own role");
+  }
+  // Never let the last admin be demoted out of the system.
   if (before.role === "admin" && role !== "admin") {
     const admins = (await data.listUsers()).filter((u) => u.role === "admin" && u.status !== "inactive");
     if (admins.length <= 1) redirect("/admin/people?error=Keep at least one admin");
@@ -396,6 +464,7 @@ export async function importPeople(formData: FormData) {
   const createdFounders: string[] = [];
   const createdMentors: string[] = [];
   let skipped = 0;
+  let createdCount = 0;
 
   for (const r of rows) {
     const email = (r.email ?? "").trim().toLowerCase();
@@ -405,6 +474,7 @@ export async function importPeople(formData: FormData) {
       company: r.company, stage: r.stage, bio: r.bio, expertise: r.expertise,
     });
     existing.add(email);
+    createdCount++;
     if (r.role === "founder") createdFounders.push(id);
     if (r.role === "mentor") createdMentors.push(id);
   }
@@ -416,8 +486,7 @@ export async function importPeople(formData: FormData) {
     await data.addToMentorPool(cohortId, createdMentors);
   }
 
-  const created = createdFounders.length + createdMentors.length +
-    rows.filter((r) => r.role !== "founder" && r.role !== "mentor").length;
+  const created = createdCount;
   await data.writeAudit({
     actorId: admin.id, action: "people.imported", subjectType: "cohort",
     subjectId: cohortId || null,
@@ -430,16 +499,31 @@ export async function importPeople(formData: FormData) {
 
 // ---- form editor ----
 
-function parseOptions(raw: string) {
-  // One option per line. "label" or "label | description".
-  return raw.split("\n").map((l) => l.trim()).filter(Boolean).map((line) => {
+// One option per line: "label" or "label | description".
+// `existing` preserves the stored value for any label already in use, so
+// editing a question never rewrites the vocabulary that answers and matching
+// are keyed on.
+function parseOptions(raw: string, existing: QuestionOption[] = []) {
+  const byLabel = new Map(existing.map((o) => [o.label.toLowerCase(), o.value]));
+  const used = new Set<string>();
+  return raw.split("\n").map((l) => l.trim()).filter(Boolean).map((line, i) => {
     const [label, description] = line.split("|").map((s) => s.trim());
-    return {
-      value: label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40),
-      label,
-      ...(description ? { description } : {}),
-    };
-  });
+    if (!label) return null;
+    let value = byLabel.get(label.toLowerCase())
+      ?? label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40);
+    if (!value) value = `option_${i + 1}`;
+    while (used.has(value)) value = `${value}_2`;
+    used.add(value);
+    return { value, label, ...(description ? { description } : {}) };
+  }).filter(Boolean) as QuestionOption[];
+}
+
+// Rejects blank and non-numeric input rather than letting NaN through, which
+// silently rendered zero choices and made the question impossible to answer.
+function parseMax(raw: string): number | undefined {
+  const n = Number(String(raw).trim());
+  if (!Number.isFinite(n) || n < 1) return undefined;
+  return Math.min(10, Math.round(n));
 }
 
 export async function createQuestion(formData: FormData) {
@@ -448,10 +532,10 @@ export async function createQuestion(formData: FormData) {
   const label = String(formData.get("label") ?? "").trim();
   if (!label) redirect(`/admin/forms/${slug}?error=Give the question a label`);
   const type = String(formData.get("type") ?? "short_text") as QuestionType;
-  const form = await getForm(slug);
+  // Archived questions still own their key, so they must count as taken.
+  const form = await getFormForEditing(slug);
   const taken = (form?.questions ?? []).map((q) => q.key);
   const key = slugifyKey(String(formData.get("key") ?? "") || label, taken);
-  const maxRaw = String(formData.get("maxSelect") ?? "").trim();
 
   await addQuestion(slug, {
     key,
@@ -462,7 +546,7 @@ export async function createQuestion(formData: FormData) {
     body: String(formData.get("body") ?? "").trim() || undefined,
     options: parseOptions(String(formData.get("options") ?? "")),
     required: formData.get("required") === "on",
-    maxSelect: maxRaw ? Number(maxRaw) : undefined,
+    maxSelect: parseMax(String(formData.get("maxSelect") ?? "")),
   });
   await data.writeAudit({
     actorId: admin.id, action: "form.question_added", subjectType: "form", subjectId: slug,
@@ -483,10 +567,11 @@ export async function editQuestion(formData: FormData) {
     body: String(formData.get("body") ?? ""),
     required: formData.get("required") === "on",
   };
+  const form = await getFormForEditing(slug);
+  const current = form?.questions.find((q) => q.id === id);
   const optionsRaw = String(formData.get("options") ?? "");
-  if (optionsRaw.trim()) patch.options = parseOptions(optionsRaw);
-  const maxRaw = String(formData.get("maxSelect") ?? "").trim();
-  if (maxRaw) patch.maxSelect = Number(maxRaw);
+  if (optionsRaw.trim()) patch.options = parseOptions(optionsRaw, current?.options ?? []);
+  patch.maxSelect = parseMax(String(formData.get("maxSelect") ?? ""));
 
   await updateQuestion(id, patch);
   await data.writeAudit({
@@ -499,7 +584,9 @@ export async function editQuestion(formData: FormData) {
 export async function reorderQuestion(formData: FormData) {
   await requireAdmin();
   const slug = String(formData.get("slug"));
-  await moveQuestion(slug, String(formData.get("id")), Number(formData.get("dir")) as -1 | 1);
+  // Only one step at a time, and never NaN, which used to throw a 500.
+  const dir = Number(formData.get("dir")) < 0 ? -1 : 1;
+  await moveQuestion(slug, String(formData.get("id")), dir);
   revalidatePath(`/admin/forms/${slug}`);
 }
 
@@ -572,10 +659,12 @@ export async function reviewApplicant(formData: FormData) {
 export async function markActionItem(formData: FormData) {
   const user = await currentUser();
   const id = String(formData.get("id"));
-  const pairingId = String(formData.get("pairingId") ?? "");
-  if (pairingId) {
-    const pairing = await data.getPairing(pairingId);
-    if (!pairing || (pairing.founderId !== user.id && pairing.mentorId !== user.id && user.role !== "admin")) return;
+  // Derive the pairing from the item itself. Trusting a pairingId from the
+  // form let anyone toggle any item by omitting the field.
+  if (user.role !== "admin") {
+    const mine = await data.pairingsForUser(user.id);
+    const lists = await Promise.all(mine.map((p) => data.actionItemsForPairing(p.id)));
+    if (!lists.flat().some((a) => a.id === id)) return;
   }
   await data.toggleActionItem(id);
   revalidatePath("/", "layout");
@@ -596,33 +685,36 @@ export async function selectMatch(formData: FormData) {
   const user = await currentUser();
   if (user.role !== "admin") return;
   const id = String(formData.get("suggestionId"));
-  await data.confirmMatch(id);
+  const created = await data.confirmMatch(id);
 
-  // Intro both sides: rationale, contact details, and who reaches out first.
-  const founderId = String(formData.get("founderId") ?? "");
-  const target = founderId
-    ? (await data.cohortHealthBoard()).find((b) => b.founder.id === founderId)
-    : undefined;
-  if (target) {
-    const { founder, mentor, pairing: p } = target;
-    const deadline = new Date(Date.now() + 5 * 86400000).toLocaleDateString("en-US", {
-      weekday: "long", month: "long", day: "numeric",
-    });
-    await emailMatchIntro({
-      to: founder.email, userId: founder.id, recipientFirst: founder.name.split(" ")[0],
-      otherName: mentor.name, otherRole: "mentor", rationale: p.matchRationale,
-      contact: mentor.email, firstContactOwner: "You", deadline,
-    });
-    await emailMatchIntro({
-      to: mentor.email, userId: mentor.id, recipientFirst: mentor.name.split(" ")[0],
-      otherName: founder.name, otherRole: "founder", rationale: p.matchRationale,
-      contact: founder.email, firstContactOwner: founder.name.split(" ")[0], deadline,
-    });
+  // Introduce exactly the two people in the pairing that was just created.
+  let emailed = false;
+  if (created) {
+    const [founder, mentor] = await Promise.all([
+      data.getUser(created.founderId), data.getUser(created.mentorId),
+    ]);
+    if (founder?.email && mentor?.email) {
+      const deadline = new Date(Date.now() + 5 * 86400000).toLocaleDateString("en-US", {
+        weekday: "long", month: "long", day: "numeric",
+      });
+      await emailMatchIntro({
+        to: founder.email, userId: founder.id, recipientFirst: founder.name.split(" ")[0],
+        otherName: mentor.name, otherRole: "mentor", rationale: created.matchRationale,
+        contact: mentor.email, firstContactOwner: "You", deadline,
+      });
+      await emailMatchIntro({
+        to: mentor.email, userId: mentor.id, recipientFirst: mentor.name.split(" ")[0],
+        otherName: founder.name, otherRole: "founder", rationale: created.matchRationale,
+        contact: founder.email, firstContactOwner: founder.name.split(" ")[0], deadline,
+      });
+      emailed = true;
+    }
   }
 
   await data.writeAudit({
-    actorId: user.id, action: "match.confirmed", subjectType: "match_suggestion",
-    subjectId: id, metadata: {},
+    actorId: user.id, action: "match.confirmed", subjectType: "pairing",
+    subjectId: created?.id ?? null,
+    metadata: { suggestionId: id, founderId: created?.founderId, mentorId: created?.mentorId, emailed },
   });
   revalidatePath("/", "layout");
 }

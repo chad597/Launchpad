@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { currentUser } from "@/lib/session";
+import { currentUser, homeForRole } from "@/lib/session";
 import { needsProfile } from "@/lib/forms";
 import {
   currentTime, getUser, lastCompletedMeeting, nextMeetingForPairing,
@@ -28,6 +28,7 @@ interface PairView {
 
 export default async function MentorHome() {
   const user = await currentUser();
+  if (user.role !== "mentor") redirect(homeForRole(user.role));
   // A newly accepted mentor completes their profile before anything else.
   if (await needsProfile(user.id)) redirect("/profile/setup");
   const pairs = await pairingsForUser(user.id);

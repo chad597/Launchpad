@@ -20,7 +20,7 @@ export default async function ApplicantDetail({ params }: { params: Promise<{ id
 
   return (
     <div className="wrap narrow">
-      <AdminNav current="/admin/applicants" />
+      <AdminNav current="/admin/applicants" role={user.role} />
       <p className="meta"><Link href="/admin/applicants">All applicants</Link></p>
       <h1 className="page">{app.name}</h1>
       <p className="sub">

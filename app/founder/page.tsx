@@ -12,7 +12,12 @@ function fmt(dt: string) {
   });
 }
 
-export default async function FounderHome() {
+export default async function FounderHome({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
   const user = await currentUser();
   const pairing = (await pairingsForUser(user.id))[0];
   if (!pairing) {
@@ -29,7 +34,7 @@ export default async function FounderHome() {
   if (!mentor) return null;
   const nextNote = next ? await noteForMeeting(next.id) : null;
   const noteDue = next ? new Date(new Date(next.scheduledAt).getTime() - 24 * 3600 * 1000) : null;
-  const hoursLeft = noteDue ? Math.max(0, Math.round((noteDue.getTime() - now.getTime()) / 3600000)) : null;
+  const minutesLeft = noteDue ? Math.round((noteDue.getTime() - now.getTime()) / 60000) : null;
   const openItems = items.filter((a) => a.status === "open");
   const msgs = allMsgs.slice(-2);
   const notes = await Promise.all(meetings.map((m) => noteForMeeting(m.id)));
@@ -38,14 +43,15 @@ export default async function FounderHome() {
 
   return (
     <div className="wrap">
-      <h1 className="page">Good afternoon, {user.name.split(" ")[0]}</h1>
+      <h1 className="page">{greeting(now)}, {user.name.split(" ")[0]}</h1>
       <p className="sub">
         {next
           ? nextNote?.founderSubmittedAt
             ? <>Your next meeting is {fmt(next.scheduledAt)}. Your half of the note is in.</>
-            : <>Your next meeting is {fmt(next.scheduledAt)}. Your half of the note is due in <span className="countdown">{hoursLeft}h</span>.</>
+            : <>Your next meeting is {fmt(next.scheduledAt)}. Your half of the note is <span className="countdown">{dueLabel(minutesLeft)}</span>.</>
           : <>No meeting on the books yet. Booking one is the single most useful next step.</>}
       </p>
+      {error && <div className="banner bad">{error}</div>}
       <div className="grid two">
         <div>
           <div className="card">
@@ -82,7 +88,7 @@ export default async function FounderHome() {
               </>
             )}
             <hr className="divider" />
-            <h2>Your action items</h2>
+            <h2>Action items</h2>
             <ul className="meta" style={{ listStyle: "none", margin: 0, padding: 0, fontSize: ".85rem" }}>
               {items.map((a) => (
                 <li key={a.id} style={{ margin: ".3rem 0" }}>
@@ -156,18 +162,43 @@ export default async function FounderHome() {
   );
 }
 
+function greeting(now: Date) {
+  const hour = Number(new Intl.DateTimeFormat("en-US", {
+    hour: "numeric", hour12: false, timeZone: "America/New_York",
+  }).format(now));
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+// Scales the unit and says "overdue" rather than sitting at a stuck "0h".
+function dueLabel(minutes: number | null): string {
+  if (minutes == null) return "due soon";
+  if (minutes < 0) {
+    const over = Math.abs(minutes);
+    return over < 60 ? "overdue" : over < 2880 ? `overdue by ${Math.round(over / 60)}h` : `overdue by ${Math.round(over / 1440)} days`;
+  }
+  if (minutes < 60) return `due in ${minutes} minutes`;
+  if (minutes < 2880) return `due in ${Math.round(minutes / 60)}h`;
+  return `due in ${Math.round(minutes / 1440)} days`;
+}
+
 function ConfidenceSpark({ values }: { values: number[] }) {
   const w = 300, h = 64, pad = 14;
+  // A single reading sits in the middle rather than pinned to the left edge.
   const step = values.length > 1 ? (w - pad * 2) / (values.length - 1) : 0;
+  const x = (i: number) => (values.length === 1 ? w / 2 : pad + i * step);
   const y = (v: number) => h - 12 - (v / 10) * (h - 26);
-  const pts = values.map((v, i) => `${pad + i * step},${y(v)}`).join(" ");
+  const pts = values.map((v, i) => `${x(i)},${y(v)}`).join(" ");
   const last = values[values.length - 1];
   return (
     <svg className="spark" viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`Confidence trend: ${values.join(", ")} out of 10`}>
       <line x1={8} y1={h - 12} x2={w - 8} y2={h - 12} stroke="var(--line)" strokeWidth="1" />
-      <polyline points={pts} fill="none" stroke="var(--teal-text)" strokeWidth="2" strokeLinecap="round" />
+      {values.length > 1 && (
+        <polyline points={pts} fill="none" stroke="var(--teal-text)" strokeWidth="2" strokeLinecap="round" />
+      )}
       {values.map((v, i) => (
-        <circle key={i} cx={pad + i * step} cy={y(v)} r={i === values.length - 1 ? 5 : 4}
+        <circle key={i} cx={x(i)} cy={y(v)} r={i === values.length - 1 ? 5 : 4}
           fill={i === values.length - 1 ? "var(--orange)" : "var(--teal-text)"} />
       ))}
       <text x={w - 10} y={14} textAnchor="end" fontSize="11" fill="var(--ink-soft)" fontWeight="700">{last} / 10</text>
