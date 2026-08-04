@@ -3,9 +3,10 @@ import { redirect } from "next/navigation";
 import { currentUser, homeForRole } from "@/lib/session";
 import { needsProfile } from "@/lib/forms";
 import {
-  currentTime, getUser, lastCompletedMeeting, nextMeetingForPairing,
+  currentTime, getUser, lastCompletedMeeting, meetingsForPairing, nextMeetingForPairing,
   noteForMeeting, pairingsForUser,
 } from "@/lib/data";
+import { meetingRhythmDays } from "@/lib/health";
 import type { Meeting, MeetingNote, Pairing, User } from "@/lib/types";
 
 function fmt(dt: string) {
@@ -24,6 +25,7 @@ interface PairView {
   nextNote: MeetingNote | null;
   last: Meeting | null;
   lastNote: MeetingNote | null;
+  rhythmDays: number | null;
 }
 
 export default async function MentorHome() {
@@ -36,14 +38,18 @@ export default async function MentorHome() {
 
   const views: PairView[] = await Promise.all(
     pairs.map(async (p) => {
-      const [founder, next, last] = await Promise.all([
+      const [founder, next, last, meetings] = await Promise.all([
         getUser(p.founderId),
         nextMeetingForPairing(p.id),
         lastCompletedMeeting(p.id),
+        meetingsForPairing(p.id),
       ]);
       const nextNote = next ? (await noteForMeeting(next.id)) ?? null : null;
       const lastNote = last ? (await noteForMeeting(last.id)) ?? null : null;
-      return { pairing: p, founder: founder!, next, nextNote, last, lastNote };
+      return {
+        pairing: p, founder: founder!, next, nextNote, last, lastNote,
+        rhythmDays: meetingRhythmDays(meetings),
+      };
     })
   );
 
@@ -79,7 +85,10 @@ export default async function MentorHome() {
                     <span className="pill info">Confidence {latestNote.confidence}/10</span>
                   )}
                 </div>
-                <p className="meta" style={{ margin: ".2rem 0 .7rem" }}>{v.founder.stage} · Meets {v.pairing.declaredCadence.replace("_", " ")}</p>
+                <p className="meta" style={{ margin: ".2rem 0 .7rem" }}>
+                  {v.founder.stage}
+                  {v.rhythmDays != null ? ` · You meet about every ${v.rhythmDays} days` : ""}
+                </p>
                 <div style={{ display: "flex", gap: ".9rem", flexWrap: "wrap", alignItems: "center" }}>
                   {v.next ? (
                     <div><div className="meta">Next meeting</div><div style={{ fontWeight: 700 }}>{fmt(v.next.scheduledAt)}</div></div>

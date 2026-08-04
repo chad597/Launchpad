@@ -1,14 +1,13 @@
 import Link from "next/link";
 import { currentUser } from "@/lib/session";
-import { cohortMembers, getCohort, listPairings, listUsers, mentorPool } from "@/lib/data";
+import {
+  cohortMembers, getCohort, listPairings, listUsers, meetingsForPairing, mentorPool,
+} from "@/lib/data";
+import { meetingRhythmDays } from "@/lib/health";
 import { addPairing, changePairing } from "../../actions";
 import { AdminNav } from "../nav";
 
 const STATUSES = ["proposed", "active", "paused", "completed", "dissolved"] as const;
-const CADENCES = ["weekly", "biweekly", "monthly", "as_needed"] as const;
-const CADENCE_LABEL = {
-  weekly: "Weekly", biweekly: "Biweekly", monthly: "Monthly", as_needed: "As needed",
-} as const;
 const STATUS_PILL = {
   active: "good", proposed: "info", paused: "warn", completed: "info", dissolved: "crit",
 } as const;
@@ -39,6 +38,11 @@ export default async function PairingsPage({
   const unmatched = founders.filter((f) => !activePairs.some((p) => p.founderId === f.id));
   const load = new Map<string, number>();
   for (const p of activePairs) load.set(p.mentorId, (load.get(p.mentorId) ?? 0) + 1);
+  // How often each pair actually meets, rather than a cadence anyone declared.
+  const rhythm = new Map<string, number | null>(
+    await Promise.all(pairings.map(async (p): Promise<[string, number | null]> =>
+      [p.id, meetingRhythmDays(await meetingsForPairing(p.id))]))
+  );
 
   return (
     <div className="wrap">
@@ -57,21 +61,17 @@ export default async function PairingsPage({
       <div className="tablewrap">
         <table className="board">
           <thead>
-            <tr><th>Founder</th><th>Mentor</th><th>Cadence</th><th>Status</th><th></th><th></th></tr>
+            <tr><th>Founder</th><th>Mentor</th><th>How often they meet</th><th>Status</th><th></th><th></th></tr>
           </thead>
           <tbody>
             {pairings.map((p) => (
               <tr key={p.id} style={p.status === "dissolved" ? { opacity: 0.55 } : undefined}>
                 <td><Link href={`/admin/pairings/${p.id}`}>{byId.get(p.founderId)?.name ?? "—"}</Link></td>
                 <td>{byId.get(p.mentorId)?.name ?? "—"}</td>
-                <td>
-                  <form action={changePairing} className="inline-form">
-                    <input type="hidden" name="id" value={p.id} />
-                    <select name="cadence" defaultValue={p.declaredCadence} aria-label="Cadence">
-                      {CADENCES.map((c) => <option key={c} value={c}>{CADENCE_LABEL[c]}</option>)}
-                    </select>
-                    <button className="linklike">Save</button>
-                  </form>
+                <td className="meta">
+                  {rhythm.get(p.id) != null
+                    ? `About every ${rhythm.get(p.id)} days`
+                    : "Not enough meetings yet"}
                 </td>
                 <td><span className={`pill ${STATUS_PILL[p.status]}`}>{p.status}</span></td>
                 <td>

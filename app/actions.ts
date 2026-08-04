@@ -571,15 +571,11 @@ export async function changePairing(formData: FormData) {
   const id = String(formData.get("id"));
   const status = String(formData.get("status") ?? "") as
     "" | "proposed" | "active" | "paused" | "completed" | "dissolved";
-  const cadence = String(formData.get("cadence") ?? "") as
-    "" | "weekly" | "biweekly" | "monthly" | "as_needed";
-  await data.updatePairing(id, {
-    status: status || undefined,
-    declaredCadence: cadence || undefined,
-  });
+  // Cadence is no longer set by anyone: health reads the rhythm the pair keeps.
+  await data.updatePairing(id, { status: status || undefined });
   await data.writeAudit({
     actorId: admin.id, action: "pairing.updated", subjectType: "pairing", subjectId: id,
-    metadata: { status: status || undefined, cadence: cadence || undefined },
+    metadata: { status: status || undefined },
   });
   revalidatePath("/", "layout");
 }

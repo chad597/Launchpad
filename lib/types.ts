@@ -137,4 +137,6 @@ export interface PairHealth {
   notesComplete: number;
   notesExpected: number;
   signal: string;
+  // How often they actually meet, in days. Null until they have met twice.
+  rhythmDays: number | null;
 }

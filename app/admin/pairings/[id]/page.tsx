@@ -98,6 +98,11 @@ export default async function PairingDetail({ params }: { params: Promise<{ id: 
           <div className="d">{health.nextMeeting ? "Booked" : "Nothing on the calendar"}</div>
         </div>
         <div className="stat">
+          <div className="n">{health.rhythmDays != null ? `${health.rhythmDays}d` : "—"}</div>
+          <div className="l">How often they meet</div>
+          <div className="d">{health.rhythmDays != null ? "From the meetings they held" : "Needs a second meeting"}</div>
+        </div>
+        <div className="stat">
           <div className="n">{health.notesComplete} / {health.notesExpected}</div>
           <div className="l">Note halves in</div>
           <div className="d">{health.notesComplete === health.notesExpected ? "Complete" : "Someone owes a half"}</div>
