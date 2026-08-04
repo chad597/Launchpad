@@ -21,24 +21,83 @@ import {
   slugifyKey, type FormQuestion, type QuestionOption, type QuestionType,
 } from "@/lib/mentor-form";
 import type { FormState } from "@/lib/form-state";
+import { issueInvite, redeemInvite } from "@/lib/invites";
 
 // ---- auth ----
 
+// The app cannot depend on sending email, so sign-in is a password the person
+// set through an invite link, or Google. Both are limited to people an admin
+// has already added: no route here creates an account.
+async function siteOrigin(): Promise<string> {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL;
+  if (configured) return configured.replace(/\/$/, "");
+  const h = await headers();
+  const origin = h.get("origin");
+  if (origin?.startsWith("http")) return origin;
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  return `${proto}://${host}`;
+}
+
 export async function signIn(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  if (!email) redirect("/login?error=Enter your email address");
+  const password = String(formData.get("password") ?? "");
+  if (!email || !password) redirect("/login?error=Enter your email and password");
   const sb = await supabaseServer();
-  const h = await headers();
-  const origin = h.get("origin") ?? h.get("x-forwarded-host") ?? "";
-  const base = origin.startsWith("http") ? origin : `https://${origin}`;
-  // Only people the program has already added may sign in. Without this,
-  // any stranger could create a session against the public anon key.
-  const { error } = await sb.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: `${base}/auth/callback`, shouldCreateUser: false },
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  // Never say which half was wrong: that would confirm who has an account.
+  if (error) redirect("/login?error=That email and password did not match");
+  redirect("/");
+}
+
+export async function signInWithGoogle() {
+  const sb = await supabaseServer();
+  const { data, error } = await sb.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: `${await siteOrigin()}/auth/callback` },
   });
-  if (error) redirect(`/login?error=${encodeURIComponent(error.message)}`);
-  redirect("/login?sent=1");
+  if (error || !data.url) redirect("/login?error=Google sign-in is not available right now");
+  redirect(data.url);
+}
+
+export async function setPasswordFromInvite(state: FormState, formData: FormData): Promise<FormState> {
+  const next = state.attempt + 1;
+  const token = String(formData.get("token") ?? "");
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirm") ?? "");
+  const fail = (error: string) => ({ attempt: next, error });
+
+  if (password.length < 10) return fail("Use at least 10 characters");
+  if (password !== confirm) return fail("Those two passwords do not match");
+
+  const result = await redeemInvite(token, password);
+  if (!result.ok || !result.email) return fail(result.reason ?? "That link is no longer valid");
+
+  // Sign them straight in: asking someone to retype what they just chose is
+  // the kind of small friction that loses volunteer mentors.
+  const sb = await supabaseServer();
+  const { error } = await sb.auth.signInWithPassword({ email: result.email, password });
+  if (error) redirect("/login?set=1");
+  redirect("/");
+}
+
+export async function createInviteLink(formData: FormData) {
+  const admin = await requireAdmin();
+  const userId = String(formData.get("userId") ?? "");
+  const purpose = String(formData.get("purpose") ?? "invite") === "reset" ? "reset" : "invite";
+  const person = await data.getUser(userId);
+  if (!person) redirect("/admin/people?error=That person is no longer here");
+
+  const issued = await issueInvite(userId, purpose, admin.id, await siteOrigin());
+  if (!issued) {
+    redirect("/admin/people?error=Invite links need SUPABASE_SERVICE_ROLE_KEY to be set");
+  }
+  await data.writeAudit({
+    actorId: admin.id, action: `person.${purpose}_link`, subjectType: "user", subjectId: userId,
+    metadata: { email: person.email },
+  });
+  revalidatePath("/admin/people");
+  redirect(`/admin/people?link=${encodeURIComponent(issued.url)}&for=${encodeURIComponent(person.name)}`);
 }
 
 export async function signOut() {

@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { currentUser } from "@/lib/session";
 import { listUsers } from "@/lib/data";
-import { addPerson, changeRole, changeStatus } from "../../actions";
+import { canIssueInvites } from "@/lib/supabase/admin";
+import { addPerson, changeRole, changeStatus, createInviteLink } from "../../actions";
 import { AdminNav } from "../nav";
+import { InviteLinkBanner } from "./invite-link";
 
 const ROLES = ["founder", "mentor", "admin"] as const;
 const ROLE_LABEL = {
@@ -12,13 +14,16 @@ const ROLE_LABEL = {
 export default async function PeoplePage({
   searchParams,
 }: {
-  searchParams: Promise<{ role?: string; added?: string; error?: string }>;
+  searchParams: Promise<{
+    role?: string; added?: string; error?: string; link?: string; for?: string;
+  }>;
 }) {
   const user = await currentUser();
   if (user.role !== "admin") {
     return <div className="wrap"><p className="meta">This view is for program admins.</p></div>;
   }
-  const { role: filter, added, error } = await searchParams;
+  const { role: filter, added, error, link, for: linkFor } = await searchParams;
+  const invitesReady = canIssueInvites();
   const all = await listUsers();
   const people = filter ? all.filter((p) => p.role === filter) : all;
   const counts = ROLES.map((r) => ({ role: r, n: all.filter((p) => p.role === r).length }));
@@ -28,10 +33,16 @@ export default async function PeoplePage({
       <AdminNav current="/admin/people" />
       <h1 className="page">People</h1>
       <p className="sub">
-        Everyone with access to the app. Adding someone here creates their account; they sign in with a link sent to this email address, so it must match the one they use.
+        Everyone with access to the app. Adding someone here creates their account. Then send them a sign-in link and they choose their own password. The email must match the one they will sign in with.
       </p>
-      {added && <div className="banner ok">{added} added. They can sign in as soon as they get a link.</div>}
+      {link && <InviteLinkBanner url={link} name={linkFor ?? "them"} />}
+      {added && <div className="banner ok">{added} added. Send them a sign-in link to finish setting up.</div>}
       {error && <div className="banner bad">{error}</div>}
+      {!invitesReady && (
+        <div className="banner bad">
+          Sign-in links need SUPABASE_SERVICE_ROLE_KEY in the environment. Until it is set, nobody new can get in.
+        </div>
+      )}
 
       <div className="stat-row">
         {counts.map((c) => (
@@ -54,7 +65,7 @@ export default async function PeoplePage({
       <div className="tablewrap">
         <table className="board">
           <thead>
-            <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Details</th><th></th></tr>
+            <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Access</th><th>Details</th><th></th></tr>
           </thead>
           <tbody>
             {people.map((p) => (
@@ -74,6 +85,20 @@ export default async function PeoplePage({
                   <span className={`pill ${p.status === "inactive" ? "crit" : "good"}`}>
                     {p.status === "inactive" ? "Inactive" : "Active"}
                   </span>
+                </td>
+                <td>
+                  {p.passwordSetAt
+                    ? <span className="pill good">Password set</span>
+                    : <span className="pill warn">Needs a link</span>}
+                  {invitesReady && p.status !== "inactive" && (
+                    <form action={createInviteLink} className="inline-form">
+                      <input type="hidden" name="userId" value={p.id} />
+                      <input type="hidden" name="purpose" value={p.passwordSetAt ? "reset" : "invite"} />
+                      <button className="linklike">
+                        {p.passwordSetAt ? "Reset link" : "Invite link"}
+                      </button>
+                    </form>
+                  )}
                 </td>
                 <td className="meta">
                   {p.company ?? p.bio ?? "—"}

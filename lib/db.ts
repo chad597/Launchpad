@@ -17,6 +17,7 @@ function mapUser(r: any): User {
     bio: r.bio ?? undefined, expertise: r.expertise ?? undefined,
     availability: r.availability ?? undefined, bookingLink: r.booking_link ?? undefined,
     capacity: r.capacity ?? undefined, status: r.status ?? "active",
+    passwordSetAt: r.password_set_at ?? undefined,
   };
 }
 

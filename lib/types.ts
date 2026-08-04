@@ -18,6 +18,9 @@ export interface User {
   bookingLink?: string;
   capacity?: number;
   status?: "active" | "inactive";
+  // Set the first time someone redeems an invite link, so admins can see who
+  // still needs one sent.
+  passwordSetAt?: string;
 }
 
 export interface AuditEntry {

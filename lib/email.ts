@@ -128,8 +128,7 @@ export async function emailAccepted(to: string, firstName: string, userId: strin
     subject: "You are in. Welcome to Launchpad mentoring",
     body: `${firstName}, we would like you to mentor for us. Welcome.
 
-Your account is ready. Sign in with this email address and we will send you a link, no password needed. The first thing you will see is a short profile: how you like to work, when you are free, and anything you would rather not be the go-to for. It takes about three minutes and it is what we use to make the match.`,
-    cta: { label: "Sign in and set up your profile", href: `${SITE}/login` },
+Your account is ready. We will send you a sign-in link separately, and it will ask you to choose a password. The first thing you will see is a short profile: how you like to work, when you are free, and anything you would rather not be the go-to for. It takes about three minutes and it is what we use to make the match.`,
   });
 }
 

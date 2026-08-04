@@ -1,6 +1,7 @@
-// Identity seam used by every page. Production: Supabase Auth (magic links),
-// mapped to the app's users table by the auth-linking trigger. Demo mode: a
-// cookie selects which seeded user you're browsing as.
+// Identity seam used by every page. Production: Supabase Auth (a password the
+// person set through an invite link, or Google), mapped to the app's users
+// table by the auth-linking trigger. Demo mode: a cookie selects which seeded
+// user you're browsing as.
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { isDemo } from "./supabase/server";
