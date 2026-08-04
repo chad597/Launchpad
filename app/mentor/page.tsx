@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { currentUser } from "@/lib/session";
 import {
-  getUser, lastCompletedMeeting, nextMeetingForPairing, noteForMeeting,
-  now, pairingsForUser,
-} from "@/lib/store";
+  currentTime, getUser, lastCompletedMeeting, nextMeetingForPairing,
+  noteForMeeting, pairingsForUser,
+} from "@/lib/data";
+import type { Meeting, MeetingNote, Pairing, User } from "@/lib/types";
 
 function fmt(dt: string) {
   return new Date(dt).toLocaleString("en-US", {
@@ -14,45 +15,58 @@ function fmt(dt: string) {
 const STATUS_LABEL = { on_track: "On track", at_risk: "At risk", off_track: "Off track" } as const;
 const STATUS_PILL = { on_track: "good", at_risk: "warn", off_track: "crit" } as const;
 
+interface PairView {
+  pairing: Pairing;
+  founder: User;
+  next: Meeting | null;
+  nextNote: MeetingNote | null;
+  last: Meeting | null;
+  lastNote: MeetingNote | null;
+}
+
 export default async function MentorHome() {
   const user = await currentUser();
-  const pairs = pairingsForUser(user.id);
+  const pairs = await pairingsForUser(user.id);
+  const now = await currentTime();
+
+  const views: PairView[] = await Promise.all(
+    pairs.map(async (p) => {
+      const [founder, next, last] = await Promise.all([
+        getUser(p.founderId),
+        nextMeetingForPairing(p.id),
+        lastCompletedMeeting(p.id),
+      ]);
+      const nextNote = next ? (await noteForMeeting(next.id)) ?? null : null;
+      const lastNote = last ? (await noteForMeeting(last.id)) ?? null : null;
+      return { pairing: p, founder: founder!, next, nextNote, last, lastNote };
+    })
+  );
 
   const todo: string[] = [];
-  for (const p of pairs) {
-    const founder = getUser(p.founderId)!;
-    const next = nextMeetingForPairing(p.id);
-    const nextNote = next ? noteForMeeting(next.id) : null;
-    if (nextNote?.founderSubmittedAt && !nextNote.mentorSubmittedAt) {
-      todo.push(`Read ${founder.name.split(" ")[0]}'s meeting note before ${fmt(next!.scheduledAt)}`);
+  for (const v of views) {
+    if (v.nextNote?.founderSubmittedAt && !v.nextNote.mentorSubmittedAt && v.next) {
+      todo.push(`Read ${v.founder.name.split(" ")[0]}'s meeting note before ${fmt(v.next.scheduledAt)}`);
     }
-    const last = lastCompletedMeeting(p.id);
-    const lastNote = last ? noteForMeeting(last.id) : null;
-    if (last && lastNote && !lastNote.mentorSubmittedAt) {
-      todo.push(`Finish your half of ${founder.name.split(" ")[0]}'s note from ${fmt(last.scheduledAt)}`);
+    if (v.last && v.lastNote && !v.lastNote.mentorSubmittedAt) {
+      todo.push(`Finish your half of ${v.founder.name.split(" ")[0]}'s note from ${fmt(v.last.scheduledAt)}`);
     }
   }
 
   return (
     <div className="wrap">
       <h1 className="page">Your founders</h1>
-      <p className="sub">{pairs.length} active pairing{pairs.length === 1 ? "" : "s"}</p>
+      <p className="sub">{views.length} active pairing{views.length === 1 ? "" : "s"}</p>
       <div className="grid two">
         <div>
-          {pairs.map((p) => {
-            const founder = getUser(p.founderId)!;
-            const next = nextMeetingForPairing(p.id);
-            const nextNote = next ? noteForMeeting(next.id) : null;
-            const last = lastCompletedMeeting(p.id);
-            const lastNote = last ? noteForMeeting(last.id) : null;
-            const latestNote = nextNote ?? lastNote;
-            const overdueDays = last && lastNote && !lastNote.mentorSubmittedAt
-              ? Math.floor((now().getTime() - new Date(last.scheduledAt).getTime()) / 86400000)
+          {views.map((v) => {
+            const latestNote = v.nextNote ?? v.lastNote;
+            const overdueDays = v.last && v.lastNote && !v.lastNote.mentorSubmittedAt
+              ? Math.floor((now.getTime() - new Date(v.last.scheduledAt).getTime()) / 86400000)
               : 0;
             return (
-              <div className="card" key={p.id}>
+              <div className="card" key={v.pairing.id}>
                 <div className="half-head">
-                  <h3>{founder.name} · {founder.company}</h3>
+                  <h3>{v.founder.name} · {v.founder.company}</h3>
                   {latestNote?.statusFlag && (
                     <span className={`pill ${STATUS_PILL[latestNote.statusFlag]}`}>{STATUS_LABEL[latestNote.statusFlag]}</span>
                   )}
@@ -60,24 +74,24 @@ export default async function MentorHome() {
                     <span className="pill info">Confidence {latestNote.confidence}/10</span>
                   )}
                 </div>
-                <p className="meta" style={{ margin: ".2rem 0 .7rem" }}>{founder.stage} · Meets {p.declaredCadence.replace("_", " ")}</p>
+                <p className="meta" style={{ margin: ".2rem 0 .7rem" }}>{v.founder.stage} · Meets {v.pairing.declaredCadence.replace("_", " ")}</p>
                 <div style={{ display: "flex", gap: ".9rem", flexWrap: "wrap", alignItems: "center" }}>
-                  {next ? (
-                    <div><div className="meta">Next meeting</div><div style={{ fontWeight: 700 }}>{fmt(next.scheduledAt)}</div></div>
-                  ) : last ? (
-                    <div><div className="meta">Last meeting</div><div style={{ fontWeight: 700 }}>{fmt(last.scheduledAt)}</div></div>
+                  {v.next ? (
+                    <div><div className="meta">Next meeting</div><div style={{ fontWeight: 700 }}>{fmt(v.next.scheduledAt)}</div></div>
+                  ) : v.last ? (
+                    <div><div className="meta">Last meeting</div><div style={{ fontWeight: 700 }}>{fmt(v.last.scheduledAt)}</div></div>
                   ) : null}
-                  {nextNote?.founderSubmittedAt && !nextNote.mentorSubmittedAt && <span className="pill good">Note received</span>}
+                  {v.nextNote?.founderSubmittedAt && !v.nextNote.mentorSubmittedAt && <span className="pill good">Note received</span>}
                   {overdueDays > 1 && <span className="pill crit">Your half of the note is {overdueDays} days overdue</span>}
                 </div>
                 <hr className="divider" />
-                {nextNote?.founderSubmittedAt && next && (
-                  <><Link className="btn" href={`/note/${next.id}`}>Read {founder.name.split(" ")[0]}&rsquo;s note</Link>{" "}</>
+                {v.nextNote?.founderSubmittedAt && v.next && (
+                  <><Link className="btn" href={`/note/${v.next.id}`}>Read {v.founder.name.split(" ")[0]}&rsquo;s note</Link>{" "}</>
                 )}
-                {last && lastNote && !lastNote.mentorSubmittedAt && (
-                  <><Link className="btn" href={`/note/${last.id}`}>Finish the note</Link>{" "}</>
+                {v.last && v.lastNote && !v.lastNote.mentorSubmittedAt && (
+                  <><Link className="btn" href={`/note/${v.last.id}`}>Finish the note</Link>{" "}</>
                 )}
-                <Link className="btn ghost" href={`/messages/${p.id}`}>Message</Link>
+                <Link className="btn ghost" href={`/messages/${v.pairing.id}`}>Message</Link>
               </div>
             );
           })}
@@ -95,7 +109,7 @@ export default async function MentorHome() {
           </div>
           <div className="card">
             <h2>Availability &amp; capacity</h2>
-            <p className="meta" style={{ margin: "0 0 .5rem" }}>1:1 windows: Tue and Thu afternoons · Capacity {pairs.length} of 2 founders</p>
+            <p className="meta" style={{ margin: "0 0 .5rem" }}>1:1 windows: Tue and Thu afternoons · Capacity {views.length} of 2 founders</p>
             <button className="btn ghost">Edit availability</button>
           </div>
           <div className="card">

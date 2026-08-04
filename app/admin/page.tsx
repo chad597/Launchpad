@@ -1,9 +1,9 @@
 import { currentUser } from "@/lib/session";
 import {
-  cohortHealthBoard, getCohort, getUser, openFlags, suggestionsForFounder,
-  weekNumber,
-} from "@/lib/store";
+  cohortHealthBoard, getCohort, getUser, openFlags, suggestionsForFounder, weekNumber,
+} from "@/lib/data";
 import { closeFlag, selectMatch } from "../actions";
+import type { User } from "@/lib/types";
 
 const HEALTH_PILL = { healthy: "good", watch: "warn", attention: "crit" } as const;
 const HEALTH_LABEL = { healthy: "Healthy", watch: "Watch", attention: "Attention" } as const;
@@ -17,23 +17,31 @@ export default async function AdminHome() {
   if (user.role !== "admin" && user.role !== "instructor") {
     return <div className="wrap"><p className="meta">This view is for program staff.</p></div>;
   }
-  const cohort = getCohort();
-  const board = cohortHealthBoard();
-  const flags = openFlags();
+  const [cohort, board, flags, week] = await Promise.all([
+    getCohort(), cohortHealthBoard(), openFlags(), weekNumber(),
+  ]);
   const needsAttention = board.filter((b) => b.health !== "healthy");
-  const noteCompliance = (() => {
-    let done = 0, expected = 0;
-    for (const b of board) { done += b.notesComplete; expected += b.notesExpected; }
-    return expected ? Math.round((100 * done) / expected) : 100;
-  })();
-  // Rematch queue: red pairs get a shortlist
+  let done = 0, expected = 0;
+  for (const b of board) { done += b.notesComplete; expected += b.notesExpected; }
+  const noteCompliance = expected ? Math.round((100 * done) / expected) : 100;
+
   const rematch = board.find((b) => b.health === "attention");
-  const suggestions = rematch ? suggestionsForFounder(rematch.founder.id) : [];
+  const suggestions = rematch ? await suggestionsForFounder(rematch.founder.id) : [];
+  const suggestionMentors = new Map<string, User>();
+  for (const s of suggestions) {
+    const m = await getUser(s.mentorId);
+    if (m) suggestionMentors.set(s.mentorId, m);
+  }
+  const flagRaisers = new Map<string, User>();
+  for (const f of flags) {
+    const u = await getUser(f.raisedById);
+    if (u) flagRaisers.set(f.raisedById, u);
+  }
 
   return (
     <div className="wrap">
       <h1 className="page">{cohort.ecosystem} · {cohort.name}</h1>
-      <p className="sub">Week {weekNumber()} of 12 · {board.length} active pairings · started {fmtDay(cohort.startDate + "T12:00:00Z")}</p>
+      <p className="sub">Week {week} of 12 · {board.length} active pairings · started {fmtDay(cohort.startDate + "T12:00:00Z")}</p>
 
       <div className="stat-row">
         <div className="stat"><div className="n">{board.length}</div><div className="l">Active pairings</div><div className="d" style={{ color: "var(--good)" }}>All matched in week 3</div></div>
@@ -72,10 +80,10 @@ export default async function AdminHome() {
             <>
               <p className="meta" style={{ margin: "0 0 .5rem" }}>Pool: volunteer mentors with open capacity</p>
               {suggestions.map((s, i) => {
-                const m = getUser(s.mentorId)!;
+                const m = suggestionMentors.get(s.mentorId);
                 return (
                   <div className={`shortlist${i === 0 ? " top" : ""}`} key={s.id}>
-                    <div className="head"><b>{m.name}</b><span className="meta">{m.bio}</span><span className="score">{s.score}</span></div>
+                    <div className="head"><b>{m?.name ?? "…"}</b><span className="meta">{m?.bio}</span><span className="score">{s.score}</span></div>
                     <div>{s.breakdown.map((c) => <span className="chip" key={c}>{c}</span>)}</div>
                     <p className="rationale">{s.rationale}</p>
                     {i === 0 && (
@@ -97,7 +105,7 @@ export default async function AdminHome() {
           {flags.length ? flags.map((f) => (
             <div className="flag" key={f.id}>
               <b style={{ fontSize: ".88rem" }}>
-                {f.category === "pattern_risk" ? "Pattern risk" : f.category === "match_not_working" ? "Match not working" : "Flag"} · {getUser(f.raisedById)?.name}
+                {f.category === "pattern_risk" ? "Pattern risk" : f.category === "match_not_working" ? "Match not working" : "Flag"} · {flagRaisers.get(f.raisedById)?.name ?? "Unknown"}
               </b>
               <p className="meta" style={{ margin: ".2rem 0" }}>&ldquo;{f.body}&rdquo;</p>
               <span className="pill warn">Open</span>{" "}

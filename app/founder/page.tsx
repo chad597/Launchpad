@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { currentUser } from "@/lib/session";
 import {
-  actionItemsForPairing, getUser, messagesForPairing, meetingsForPairing,
-  nextMeetingForPairing, noteForMeeting, now, pairingsForUser,
-} from "@/lib/store";
+  actionItemsForPairing, currentTime, getUser, messagesForPairing,
+  meetingsForPairing, nextMeetingForPairing, noteForMeeting, pairingsForUser,
+} from "@/lib/data";
 import { markActionItem } from "../actions";
 
 function fmt(dt: string) {
@@ -14,22 +14,27 @@ function fmt(dt: string) {
 
 export default async function FounderHome() {
   const user = await currentUser();
-  const pairing = pairingsForUser(user.id)[0];
+  const pairing = (await pairingsForUser(user.id))[0];
   if (!pairing) {
     return <div className="wrap"><h1 className="page">Welcome, {user.name}</h1><p className="sub">Your mentor match arrives in week 3. Until then, use Ask-A-Mentor and office hours.</p></div>;
   }
-  const mentor = getUser(pairing.mentorId)!;
-  const next = nextMeetingForPairing(pairing.id);
-  const nextNote = next ? noteForMeeting(next.id) : null;
+  const [mentor, next, items, allMsgs, meetings, now] = await Promise.all([
+    getUser(pairing.mentorId),
+    nextMeetingForPairing(pairing.id),
+    actionItemsForPairing(pairing.id),
+    messagesForPairing(pairing.id),
+    meetingsForPairing(pairing.id),
+    currentTime(),
+  ]);
+  if (!mentor) return null;
+  const nextNote = next ? await noteForMeeting(next.id) : null;
   const noteDue = next ? new Date(new Date(next.scheduledAt).getTime() - 24 * 3600 * 1000) : null;
-  const hoursLeft = noteDue ? Math.max(0, Math.round((noteDue.getTime() - now().getTime()) / 3600000)) : null;
-  const items = actionItemsForPairing(pairing.id);
+  const hoursLeft = noteDue ? Math.max(0, Math.round((noteDue.getTime() - now.getTime()) / 3600000)) : null;
   const openItems = items.filter((a) => a.status === "open");
-  const msgs = messagesForPairing(pairing.id).slice(-2);
-  const confidences = meetingsForPairing(pairing.id)
-    .map((m) => noteForMeeting(m.id))
-    .filter((n) => n?.confidence != null)
-    .map((n) => n!.confidence!);
+  const msgs = allMsgs.slice(-2);
+  const notes = await Promise.all(meetings.map((m) => noteForMeeting(m.id)));
+  const confidences = notes.filter((n) => n?.confidence != null).map((n) => n!.confidence!);
+  const people = new Map([[user.id, user], [mentor.id, mentor]]);
 
   return (
     <div className="wrap">
@@ -68,12 +73,13 @@ export default async function FounderHome() {
                 <li key={a.id} style={{ margin: ".3rem 0" }}>
                   <form action={markActionItem} style={{ display: "inline" }}>
                     <input type="hidden" name="id" value={a.id} />
+                    <input type="hidden" name="pairingId" value={a.pairingId} />
                     <button className="linklike" aria-label={a.status === "done" ? "Mark open" : "Mark done"}>
                       {a.status === "done" ? "☑" : "☐"}
                     </button>
                   </form>{" "}
                   <span style={{ color: "var(--ink)" }}>{a.description}</span>{" "}
-                  <span className="meta">({getUser(a.ownerId)?.name.split(" ")[0]} · due {a.dueDate})</span>
+                  <span className="meta">({people.get(a.ownerId)?.name.split(" ")[0] ?? "…"} · due {a.dueDate})</span>
                 </li>
               ))}
             </ul>
@@ -84,11 +90,11 @@ export default async function FounderHome() {
           <div className="card">
             <h2>Messages · {mentor.name}</h2>
             {msgs.map((m) => {
-              const sender = getUser(m.senderId)!;
+              const sender = people.get(m.senderId);
               const mine = m.senderId === user.id;
               return (
                 <div className="msg" key={m.id}>
-                  <span className={`avatar${mine ? " o" : ""}`}>{sender.name.split(" ").map((w) => w[0]).join("")}</span>
+                  <span className={`avatar${mine ? " o" : ""}`}>{(sender?.name ?? "?").split(" ").map((w) => w[0]).join("")}</span>
                   <div><div className="bubble">{m.body}</div><div className="t">{fmt(m.createdAt)}</div></div>
                 </div>
               );

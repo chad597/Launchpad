@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { currentUser } from "@/lib/session";
 import {
   actionItemsForPairing, getMeeting, getPairing, getUser, noteForMeeting,
-} from "@/lib/store";
+} from "@/lib/data";
 import { completeMentorHalf } from "../../actions";
 
 const STATUS_LABEL = { on_track: "On track", at_risk: "At risk", off_track: "Off track" } as const;
@@ -17,15 +17,21 @@ function fmt(dt: string) {
 export default async function NotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await currentUser();
-  const meeting = getMeeting(id);
+  const meeting = await getMeeting(id);
   if (!meeting) notFound();
-  const pairing = getPairing(meeting.pairingId)!;
-  const founder = getUser(pairing.founderId)!;
-  const mentor = getUser(pairing.mentorId)!;
-  const note = noteForMeeting(meeting.id);
+  const pairing = await getPairing(meeting.pairingId);
+  if (!pairing) notFound();
+  const [founder, mentor, note, allItems] = await Promise.all([
+    getUser(pairing.founderId),
+    getUser(pairing.mentorId),
+    noteForMeeting(meeting.id),
+    actionItemsForPairing(pairing.id),
+  ]);
+  if (!founder || !mentor) notFound();
   const fs = note?.founderSection ?? null;
   const ms = note?.mentorSection ?? null;
-  const priorItems = actionItemsForPairing(pairing.id).filter((a) => a.meetingId !== meeting.id);
+  const priorItems = allItems.filter((a) => a.meetingId !== meeting.id);
+  const people = new Map([[founder.id, founder], [mentor.id, mentor]]);
   const isMentor = user.id === mentor.id;
   const canFinish = isMentor && fs && !note?.mentorSubmittedAt;
 
@@ -51,7 +57,7 @@ export default async function NotePage({ params }: { params: Promise<{ id: strin
               <div className="formrow"><span className="label">Last meeting&rsquo;s action items</span>
                 <ul className="bare">
                   {priorItems.map((a) => (
-                    <li key={a.id}>{a.status === "done" ? "☑" : "☐"} {a.description} <span className="meta">({getUser(a.ownerId)?.name.split(" ")[0]}, due {a.dueDate})</span></li>
+                    <li key={a.id}>{a.status === "done" ? "☑" : "☐"} {a.description} <span className="meta">({people.get(a.ownerId)?.name.split(" ")[0] ?? "…"}, due {a.dueDate})</span></li>
                   ))}
                 </ul>
               </div>

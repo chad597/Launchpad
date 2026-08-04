@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { currentUser } from "@/lib/session";
-import { getPairing, getUser, messagesForPairing } from "@/lib/store";
+import { getPairing, getUser, messagesForPairing } from "@/lib/data";
 import { postMessage } from "../../actions";
 
 function fmt(dt: string) {
@@ -12,16 +12,20 @@ function fmt(dt: string) {
 export default async function Thread({ params }: { params: Promise<{ pairingId: string }> }) {
   const { pairingId } = await params;
   const user = await currentUser();
-  const pairing = getPairing(pairingId);
+  const pairing = await getPairing(pairingId);
   if (!pairing) notFound();
-  const founder = getUser(pairing.founderId)!;
-  const mentor = getUser(pairing.mentorId)!;
+  const [founder, mentor, msgs] = await Promise.all([
+    getUser(pairing.founderId),
+    getUser(pairing.mentorId),
+    messagesForPairing(pairingId),
+  ]);
+  if (!founder || !mentor) notFound();
   const isMember = user.id === founder.id || user.id === mentor.id;
   const isStaff = user.role === "admin";
   if (!isMember && !isStaff) {
     return <div className="wrap narrow"><p className="meta">This conversation is private to the pair and program staff.</p></div>;
   }
-  const msgs = messagesForPairing(pairingId);
+  const people = new Map([[founder.id, founder], [mentor.id, mentor]]);
   const other = user.id === founder.id ? mentor : founder;
 
   return (
@@ -32,12 +36,12 @@ export default async function Thread({ params }: { params: Promise<{ pairingId: 
         : "Program staff can access conversations for safety and program quality."}</p>
       <div className="card">
         {msgs.map((m) => {
-          const sender = getUser(m.senderId)!;
+          const sender = people.get(m.senderId);
           const mine = m.senderId === user.id;
           return (
             <div className="msg" key={m.id}>
-              <span className={`avatar${mine ? " o" : ""}`}>{sender.name.split(" ").map((w) => w[0]).join("")}</span>
-              <div><div className="bubble">{m.body}</div><div className="t">{sender.name.split(" ")[0]} · {fmt(m.createdAt)}</div></div>
+              <span className={`avatar${mine ? " o" : ""}`}>{(sender?.name ?? "?").split(" ").map((w) => w[0]).join("")}</span>
+              <div><div className="bubble">{m.body}</div><div className="t">{sender?.name.split(" ")[0] ?? "…"} · {fmt(m.createdAt)}</div></div>
             </div>
           );
         })}
@@ -46,7 +50,6 @@ export default async function Thread({ params }: { params: Promise<{ pairingId: 
             <hr className="divider" />
             <form action={postMessage}>
               <input type="hidden" name="pairingId" value={pairingId} />
-              <input type="hidden" name="senderId" value={user.id} />
               <div className="formrow">
                 <label htmlFor="body">Message {other.name.split(" ")[0]}</label>
                 <textarea id="body" name="body" required />

@@ -6,8 +6,9 @@ import {
   actionItems, cohorts, DEMO_TODAY, flags, matchSuggestions, meetingNotes,
   meetings, messages, pairings, users,
 } from "./fixtures";
+import { computePairHealth, healthRank } from "./health";
 import type {
-  ActionItem, Flag, Health, MatchSuggestion, Meeting, MeetingNote, MentorSection,
+  ActionItem, Flag, MatchSuggestion, Meeting, MeetingNote, MentorSection,
   Message, PairHealth, Pairing, User,
 } from "./types";
 
@@ -119,71 +120,24 @@ export function lastCompletedMeeting(pairingId: string): Meeting | null {
   return done.length ? done[done.length - 1] : null;
 }
 
-const CADENCE_DAYS: Record<Pairing["declaredCadence"], number | null> = {
-  weekly: 7, biweekly: 14, monthly: 30, as_needed: null,
-};
-
-// Health per spec §6: no-next-meeting is the strongest signal (yellow at 7
-// days unbooked, red at 14), then cadence adherence, then note compliance.
+// Health scoring lives in lib/health.ts, shared with the Supabase layer.
 export function pairHealth(pairing: Pairing): PairHealth {
-  const founder = getUser(pairing.founderId)!;
-  const mentor = getUser(pairing.mentorId)!;
-  const next = nextMeetingForPairing(pairing.id);
-  const last = lastCompletedMeeting(pairing.id);
-  const dayMs = 24 * 3600 * 1000;
-  const lastMetDaysAgo = last
-    ? Math.floor((now().getTime() - new Date(last.scheduledAt).getTime()) / dayMs)
-    : null;
-
-  const completed = meetingsForPairing(pairing.id).filter((m) => m.status === "completed");
-  const notesExpected = completed.length * 2;
-  let notesComplete = 0;
-  for (const m of completed) {
-    const n = noteForMeeting(m.id);
-    if (n?.founderSubmittedAt) notesComplete++;
-    if (n?.mentorSubmittedAt) notesComplete++;
-  }
-
-  let health: Health = "healthy";
-  let signal = "On cadence";
-
-  const unbookedDays = next ? 0 : lastMetDaysAgo ?? 99;
-  if (!next && unbookedDays >= 14) {
-    health = "attention";
-    signal = `No next meeting, day ${unbookedDays}`;
-  } else if (!next && unbookedDays >= 7) {
-    health = "watch";
-    signal = `No next meeting, day ${unbookedDays} of 14`;
-  }
-
-  const cadence = CADENCE_DAYS[pairing.declaredCadence];
-  if (health === "healthy" && cadence && lastMetDaysAgo !== null && lastMetDaysAgo > cadence + 4) {
-    health = "watch";
-    signal = `Behind declared ${pairing.declaredCadence} cadence`;
-  }
-
-  if (health === "healthy" && notesExpected > notesComplete) {
-    health = "watch";
-    signal = "Meeting note incomplete";
-  }
-
-  const lastMsg = messagesForPairing(pairing.id).at(-1);
-  const silentDays = lastMsg
-    ? Math.floor((now().getTime() - new Date(lastMsg.createdAt).getTime()) / dayMs)
-    : 99;
-  if (health === "attention" && silentDays >= 10) {
-    signal += `, silent thread for ${silentDays} days`;
-  }
-
-  return { pairing, founder, mentor, health, lastMetDaysAgo, nextMeeting: next, notesComplete, notesExpected, signal };
+  return computePairHealth({
+    pairing,
+    founder: getUser(pairing.founderId)!,
+    mentor: getUser(pairing.mentorId)!,
+    meetings: meetingsForPairing(pairing.id),
+    notes: store().notes,
+    messages: messagesForPairing(pairing.id),
+    now: now(),
+  });
 }
 
 export function cohortHealthBoard(): PairHealth[] {
-  const rank: Record<Health, number> = { attention: 0, watch: 1, healthy: 2 };
   return store()
     .pairings.filter((p) => p.status === "active")
     .map(pairHealth)
-    .sort((a, b) => rank[a.health] - rank[b.health]);
+    .sort((a, b) => healthRank(a.health) - healthRank(b.health));
 }
 
 // ---- mutations (demo) ----
