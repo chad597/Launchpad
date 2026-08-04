@@ -29,7 +29,7 @@ export function parseCsv(text: string): string[][] {
 export interface ImportRow {
   name: string;
   email: string;
-  role: "founder" | "mentor" | "instructor" | "admin";
+  role: "founder" | "mentor" | "admin";
   company?: string;
   stage?: string;
   bio?: string;
@@ -87,7 +87,6 @@ export function parsePeople(text: string, defaultRole: ImportRow["role"]): Parse
     const role: ImportRow["role"] =
       rawRole.startsWith("found") ? "founder"
       : rawRole.startsWith("ment") ? "mentor"
-      : rawRole.startsWith("instr") || rawRole.startsWith("sherpa") ? "instructor"
       : rawRole.startsWith("admin") ? "admin"
       : defaultRole;
 

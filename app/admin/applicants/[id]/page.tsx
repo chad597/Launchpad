@@ -11,7 +11,7 @@ const STATUS_PILL = { new: "info", reviewing: "warn", accepted: "good", declined
 export default async function ApplicantDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await currentUser();
-  if (user.role !== "admin" && user.role !== "instructor") {
+  if (user.role !== "admin") {
     return <div className="wrap"><p className="meta">This view is for program staff.</p></div>;
   }
   const [app, form] = await Promise.all([getApplication(id), getFormForEditing("mentor-application")]);
@@ -20,7 +20,7 @@ export default async function ApplicantDetail({ params }: { params: Promise<{ id
 
   return (
     <div className="wrap narrow">
-      <AdminNav current="/admin/applicants" role={user.role} />
+      <AdminNav current="/admin/applicants" />
       <p className="meta"><Link href="/admin/applicants">All applicants</Link></p>
       <h1 className="page">{app.name}</h1>
       <p className="sub">

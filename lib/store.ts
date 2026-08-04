@@ -233,7 +233,7 @@ export function setAvailability(userId: string, availability: string, capacity: 
 // ---- admin ----
 
 export function listUsers(): User[] {
-  const order = { admin: 0, instructor: 1, mentor: 2, founder: 3 };
+  const order = { admin: 0, mentor: 1, founder: 2 };
   return [...store().users].sort(
     (a, b) => order[a.role] - order[b.role] || a.name.localeCompare(b.name)
   );

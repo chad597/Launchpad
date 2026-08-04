@@ -10,7 +10,6 @@ export const DEMO_TODAY = "2026-08-03T12:00:00.000Z";
 
 export const users: User[] = [
   { id: "u-chad", email: "chad@launchpad.test", name: "Chad Hensel", role: "admin" },
-  { id: "u-taylor", email: "taylor@launchpad.test", name: "Taylor Finch", role: "instructor" },
   { id: "u-alex", email: "alex@trellis.test", name: "Alex Rivera", role: "founder", company: "Trellis", stage: "Idea stage, two-sided marketplace" },
   { id: "u-jordan", email: "jordan@fernway.test", name: "Jordan Lee", role: "founder", company: "Fernway", stage: "Idea stage, consumer app" },
   { id: "u-priya", email: "priya@lucent.test", name: "Priya Nguyen", role: "founder", company: "Lucent Pay", stage: "Pre-revenue, B2B fintech" },

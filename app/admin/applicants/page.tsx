@@ -19,7 +19,7 @@ export default async function ApplicantsPage({
   searchParams: Promise<{ status?: string }>;
 }) {
   const user = await currentUser();
-  if (user.role !== "admin" && user.role !== "instructor") {
+  if (user.role !== "admin") {
     return <div className="wrap"><p className="meta">This view is for program staff.</p></div>;
   }
   const { status } = await searchParams;
@@ -37,7 +37,7 @@ export default async function ApplicantsPage({
 
   return (
     <div className="wrap">
-      <AdminNav current="/admin/applicants" role={user.role} />
+      <AdminNav current="/admin/applicants" />
       <h1 className="page">Potential mentors</h1>
       <p className="sub">
         Everyone who has applied at <code>/apply</code>. Accepting someone creates their mentor account and sends them to the profile form at first sign-in.

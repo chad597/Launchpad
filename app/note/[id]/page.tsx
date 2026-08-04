@@ -35,10 +35,9 @@ export default async function NotePage({
   ]);
   if (!founder || !mentor) notFound();
 
-  // A meeting note is private to the pair and program staff. Instructors are
-  // deliberately included here (they own cohort quality) but never in messages.
+  // A meeting note is private to the pair and program admins.
   const isMember = user.id === founder.id || user.id === mentor.id;
-  const isStaff = user.role === "admin" || user.role === "instructor";
+  const isStaff = user.role === "admin";
   if (!isMember && !isStaff) {
     return (
       <div className="wrap narrow">

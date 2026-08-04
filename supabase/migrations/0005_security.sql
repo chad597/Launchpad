@@ -1,5 +1,49 @@
--- Security fixes found in the August 2026 QA pass. Every item here is a
--- production-only issue: demo mode never exercises row-level security.
+-- Security fixes found in the August 2026 QA pass, plus removal of the
+-- instructor role. Every item here is a production-only issue: demo mode
+-- never exercises row-level security.
+
+-- ===== 0. Remove the instructor role =====
+-- Instructors were never asked for and should have no access to the app.
+-- 0001 granted them read access to pairings, meetings, notes, action items,
+-- flags, questionnaire responses and the mentor pool. All of it is revoked
+-- here, and the seeded instructor account is removed.
+
+drop policy if exists pool_read on cohort_mentor_pool;
+create policy pool_read on cohort_mentor_pool for select
+  using (current_app_role() = 'admin');
+
+drop policy if exists qr_own on questionnaire_responses;
+create policy qr_own on questionnaire_responses for select
+  using (user_id = current_app_user() or current_app_role() = 'admin');
+
+drop policy if exists pairings_read on pairings;
+create policy pairings_read on pairings for select
+  using (founder_id = current_app_user() or mentor_id = current_app_user()
+         or current_app_role() = 'admin');
+
+drop policy if exists meetings_read on meetings;
+create policy meetings_read on meetings for select
+  using (in_pairing(pairing_id) or current_app_role() = 'admin');
+
+drop policy if exists items_read on action_items;
+create policy items_read on action_items for select
+  using (in_pairing(pairing_id) or current_app_role() = 'admin');
+
+drop policy if exists flags_own on flags;
+create policy flags_own on flags for select
+  using (raised_by = current_app_user() or current_app_role() = 'admin');
+
+drop policy if exists audit_staff_read on audit_log;
+create policy audit_admin_read on audit_log for select
+  using (current_app_role() = 'admin');
+
+drop policy if exists applications_staff_read on mentor_applications;
+create policy applications_admin_read on mentor_applications for select
+  using (current_app_role() = 'admin');
+
+-- Anyone already carrying the role loses it. Nothing in the app creates
+-- instructors any more, so this is the seeded demo account.
+delete from users where role = 'instructor';
 
 -- ===== 1. Privilege escalation =====
 -- 0002 granted every signed-in user UPDATE on their whole users row so mentors
@@ -47,7 +91,7 @@ create policy users_read_self on users for select
   using (auth_user_id = auth.uid());
 
 create policy users_read_staff on users for select
-  using (current_app_role() in ('admin', 'instructor'));
+  using (current_app_role() = 'admin');
 
 -- Your counterpart in an active pairing, so names and profiles still render.
 create policy users_read_counterpart on users for select
@@ -128,12 +172,12 @@ begin
   return new;
 end $$;
 
--- ===== 6. Meeting notes follow the same rule as the rest of the pair data =====
--- Instructors own cohort quality and may read notes; they still have no
--- access to messages, which was an explicit program decision.
+-- ===== 6. Meeting notes are pair-private =====
+-- The app previously let any signed-in user read any pair's note; the policy
+-- here matches the fixed application check.
 drop policy if exists notes_read on meeting_notes;
 create policy notes_read on meeting_notes for select
   using (
     exists (select 1 from meetings m where m.id = meeting_id and in_pairing(m.pairing_id))
-    or current_app_role() in ('admin', 'instructor')
+    or current_app_role() = 'admin'
   );

@@ -308,7 +308,7 @@ export async function addPerson(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (!email || !name) redirect("/admin/people?error=Name and email are both required");
   const role = String(formData.get("role") ?? "founder") as
-    | "founder" | "mentor" | "instructor" | "admin";
+    | "founder" | "mentor" | "admin";
   const expertise = String(formData.get("expertise") ?? "")
     .split(",").map((s) => s.trim()).filter(Boolean);
 
@@ -337,7 +337,7 @@ export async function addPerson(formData: FormData) {
 export async function changeRole(formData: FormData) {
   const admin = await requireAdmin();
   const id = String(formData.get("id"));
-  const role = String(formData.get("role")) as "founder" | "mentor" | "instructor" | "admin";
+  const role = String(formData.get("role")) as "founder" | "mentor" | "admin";
   const before = await data.getUser(id);
   if (!before || before.role === role) return;
   // Changing your own role locks you out with no way back.

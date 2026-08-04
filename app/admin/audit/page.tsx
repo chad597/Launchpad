@@ -32,14 +32,14 @@ function detail(metadata: Record<string, unknown>) {
 
 export default async function AuditPage() {
   const user = await currentUser();
-  if (user.role !== "admin" && user.role !== "instructor") {
+  if (user.role !== "admin") {
     return <div className="wrap"><p className="meta">This view is for program staff.</p></div>;
   }
   const entries = await listAudit(200);
 
   return (
     <div className="wrap">
-      <AdminNav current="/admin/audit" role={user.role} />
+      <AdminNav current="/admin/audit" />
       <h1 className="page">Audit log</h1>
       <p className="sub">
         Who did what, and when. Entries are written automatically and cannot be edited or removed, including staff access to a pair&rsquo;s conversation.

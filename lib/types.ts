@@ -1,4 +1,4 @@
-export type Role = "founder" | "mentor" | "instructor" | "admin";
+export type Role = "founder" | "mentor" | "admin";
 export type StatusFlag = "on_track" | "at_risk" | "off_track";
 export type PairingStatus = "proposed" | "active" | "paused" | "completed" | "dissolved";
 export type MeetingStatus = "scheduled" | "completed" | "no_show" | "canceled";

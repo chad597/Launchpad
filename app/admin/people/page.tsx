@@ -4,9 +4,9 @@ import { listUsers } from "@/lib/data";
 import { addPerson, changeRole, changeStatus } from "../../actions";
 import { AdminNav } from "../nav";
 
-const ROLES = ["founder", "mentor", "instructor", "admin"] as const;
+const ROLES = ["founder", "mentor", "admin"] as const;
 const ROLE_LABEL = {
-  founder: "Founder", mentor: "Mentor", instructor: "Instructor", admin: "Admin",
+  founder: "Founder", mentor: "Mentor", admin: "Admin",
 } as const;
 
 export default async function PeoplePage({

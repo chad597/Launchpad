@@ -5,7 +5,7 @@ import { parsePeople, type ImportRow, type ParsedRow } from "@/lib/csv";
 import { importPeople } from "../../actions";
 
 const ROLE_LABEL = {
-  founder: "Founder", mentor: "Mentor", instructor: "Instructor", admin: "Admin",
+  founder: "Founder", mentor: "Mentor", admin: "Admin",
 } as const;
 
 export function ImportClient({
@@ -71,7 +71,6 @@ export function ImportClient({
             onChange={(e) => setDefaultRole(e.target.value as ImportRow["role"])}>
             <option value="founder">Founder</option>
             <option value="mentor">Mentor</option>
-            <option value="instructor">Instructor</option>
           </select>
         </div>
         <button type="button" className="btn" onClick={preview} disabled={!text.trim()}>

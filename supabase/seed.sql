@@ -13,7 +13,6 @@ insert into cohorts (id, ecosystem_id, name, start_date, status) values
 
 insert into users (id, email, name, role, company, stage, bio, expertise) values
   ('a0000000-0000-0000-0000-000000000001', 'chad.hensel@gmail.com', 'Chad Hensel', 'admin', null, null, null, null),
-  ('a0000000-0000-0000-0000-000000000002', 'taylor@launchpad.test', 'Taylor Finch', 'instructor', null, null, null, null),
   ('f0000000-0000-0000-0000-000000000001', 'alex@trellis.test', 'Alex Rivera', 'founder', 'Trellis', 'Idea stage, two-sided marketplace', null, null),
   ('f0000000-0000-0000-0000-000000000002', 'jordan@fernway.test', 'Jordan Lee', 'founder', 'Fernway', 'Idea stage, consumer app', null, null),
   ('f0000000-0000-0000-0000-000000000003', 'priya@lucent.test', 'Priya Nguyen', 'founder', 'Lucent Pay', 'Pre-revenue, B2B fintech', null, null),

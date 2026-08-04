@@ -15,7 +15,7 @@ function fmtDay(dt: string) {
 
 export default async function AdminHome() {
   const user = await currentUser();
-  if (user.role !== "admin" && user.role !== "instructor") {
+  if (user.role !== "admin") {
     return <div className="wrap"><p className="meta">This view is for program staff.</p></div>;
   }
   const [cohort, board, flags, week] = await Promise.all([
@@ -41,7 +41,7 @@ export default async function AdminHome() {
 
   return (
     <div className="wrap">
-      <AdminNav current="/admin" role={user.role} />
+      <AdminNav current="/admin" />
       <h1 className="page">{cohort.ecosystem} · {cohort.name}</h1>
       <p className="sub">Week {week} of 12 · {board.length} active pairings · started {fmtDay(cohort.startDate + "T12:00:00Z")}</p>
 
