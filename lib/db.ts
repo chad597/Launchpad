@@ -4,8 +4,8 @@
 import { supabaseServer } from "./supabase/server";
 import { computePairHealth, healthRank } from "./health";
 import type {
-  ActionItem, Cohort, Flag, FounderSection, MatchSuggestion, Meeting, MeetingNote,
-  MentorSection, Message, PairHealth, Pairing, StatusFlag, User,
+  ActionItem, AuditEntry, Cohort, Flag, FounderSection, MatchSuggestion, Meeting,
+  MeetingNote, MentorSection, Message, PairHealth, Pairing, StatusFlag, User,
 } from "./types";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -16,7 +16,7 @@ function mapUser(r: any): User {
     company: r.company ?? undefined, stage: r.stage ?? undefined,
     bio: r.bio ?? undefined, expertise: r.expertise ?? undefined,
     availability: r.availability ?? undefined, bookingLink: r.booking_link ?? undefined,
-    capacity: r.capacity ?? undefined,
+    capacity: r.capacity ?? undefined, status: r.status ?? "active",
   };
 }
 
@@ -296,6 +296,137 @@ export async function raiseFlag(
 export async function setAvailability(userId: string, availability: string, capacity: number) {
   const sb = await supabaseServer();
   await sb.from("users").update({ availability, capacity }).eq("id", userId);
+}
+
+// ---- admin ----
+
+export async function listUsers(): Promise<User[]> {
+  const sb = await supabaseServer();
+  const { data } = await sb.from("users").select("*").order("role").order("name");
+  return (data ?? []).map(mapUser);
+}
+
+export async function createUser(u: Omit<User, "id">): Promise<string> {
+  const sb = await supabaseServer();
+  const { data } = await sb
+    .from("users")
+    .insert({
+      email: u.email, name: u.name, role: u.role,
+      company: u.company ?? null, stage: u.stage ?? null, bio: u.bio ?? null,
+      expertise: u.expertise ?? null, invited_at: new Date().toISOString(),
+    })
+    .select("id")
+    .maybeSingle();
+  return data?.id ?? "";
+}
+
+export async function updateUserRole(id: string, role: User["role"]) {
+  const sb = await supabaseServer();
+  await sb.from("users").update({ role }).eq("id", id);
+}
+
+export async function setUserStatus(id: string, status: "active" | "inactive") {
+  const sb = await supabaseServer();
+  await sb.from("users").update({ status }).eq("id", id);
+}
+
+export async function listCohorts(): Promise<Cohort[]> {
+  const sb = await supabaseServer();
+  const { data } = await sb
+    .from("cohorts").select("*, ecosystems(name)").order("start_date", { ascending: false });
+  return (data ?? []).map((r: any) => ({
+    id: r.id, ecosystem: r.ecosystems?.name ?? "Launchpad",
+    name: r.name, startDate: r.start_date, status: r.status,
+  }));
+}
+
+export async function createCohort(c: Omit<Cohort, "id">): Promise<string> {
+  const sb = await supabaseServer();
+  let { data: eco } = await sb.from("ecosystems").select("id").eq("name", c.ecosystem).maybeSingle();
+  if (!eco) {
+    const { data: created } = await sb.from("ecosystems").insert({ name: c.ecosystem }).select("id").maybeSingle();
+    eco = created;
+  }
+  const { data } = await sb
+    .from("cohorts")
+    .insert({ ecosystem_id: eco?.id, name: c.name, start_date: c.startDate, status: c.status })
+    .select("id")
+    .maybeSingle();
+  return data?.id ?? "";
+}
+
+export async function setCohortStatus(id: string, status: Cohort["status"]) {
+  const sb = await supabaseServer();
+  await sb.from("cohorts").update({ status }).eq("id", id);
+}
+
+export async function mentorPool(cohortId: string): Promise<string[]> {
+  const sb = await supabaseServer();
+  const { data } = await sb.from("cohort_mentor_pool").select("mentor_id").eq("cohort_id", cohortId);
+  return (data ?? []).map((r: any) => r.mentor_id);
+}
+
+export async function setMentorPool(cohortId: string, mentorIds: string[]) {
+  const sb = await supabaseServer();
+  await sb.from("cohort_mentor_pool").delete().eq("cohort_id", cohortId);
+  if (mentorIds.length) {
+    await sb.from("cohort_mentor_pool").insert(
+      mentorIds.map((mentor_id) => ({ cohort_id: cohortId, mentor_id }))
+    );
+  }
+}
+
+export async function listPairings(cohortId: string): Promise<Pairing[]> {
+  const sb = await supabaseServer();
+  const { data } = await sb.from("pairings").select("*").eq("cohort_id", cohortId);
+  return (data ?? []).map(mapPairing);
+}
+
+export async function createPairing(
+  cohortId: string, founderId: string, mentorId: string,
+  cadence: Pairing["declaredCadence"], rationale: string
+) {
+  const sb = await supabaseServer();
+  await sb.from("pairings").insert({
+    cohort_id: cohortId, founder_id: founderId, mentor_id: mentorId,
+    status: "active", declared_cadence: cadence, match_rationale: rationale,
+    started_at: new Date().toISOString(),
+  });
+}
+
+export async function updatePairing(
+  id: string, changes: { status?: Pairing["status"]; declaredCadence?: Pairing["declaredCadence"] }
+) {
+  const sb = await supabaseServer();
+  const patch: Record<string, unknown> = {};
+  if (changes.status) {
+    patch.status = changes.status;
+    if (changes.status === "dissolved" || changes.status === "completed") {
+      patch.ended_at = new Date().toISOString();
+    }
+  }
+  if (changes.declaredCadence) patch.declared_cadence = changes.declaredCadence;
+  if (Object.keys(patch).length) await sb.from("pairings").update(patch).eq("id", id);
+}
+
+export async function writeAudit(e: Omit<AuditEntry, "id" | "createdAt">) {
+  const sb = await supabaseServer();
+  await sb.from("audit_log").insert({
+    actor_id: e.actorId, action: e.action, subject_type: e.subjectType,
+    subject_id: e.subjectId, metadata: e.metadata,
+  });
+}
+
+export async function listAudit(limit = 100): Promise<AuditEntry[]> {
+  const sb = await supabaseServer();
+  const { data } = await sb
+    .from("audit_log").select("*, users!audit_log_actor_id_fkey(name)")
+    .order("created_at", { ascending: false }).limit(limit);
+  return (data ?? []).map((r: any) => ({
+    id: String(r.id), actorId: r.actor_id, actorName: r.users?.name,
+    action: r.action, subjectType: r.subject_type, subjectId: r.subject_id,
+    metadata: r.metadata ?? {}, createdAt: r.created_at,
+  }));
 }
 
 export async function toggleActionItem(id: string) {

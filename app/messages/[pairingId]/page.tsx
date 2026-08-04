@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { currentUser } from "@/lib/session";
-import { getPairing, getUser, messagesForPairing } from "@/lib/data";
+import { getPairing, getUser, messagesForPairing, writeAudit } from "@/lib/data";
 import { postMessage } from "../../actions";
 
 function fmt(dt: string) {
@@ -24,6 +24,13 @@ export default async function Thread({ params }: { params: Promise<{ pairingId: 
   const isStaff = user.role === "admin";
   if (!isMember && !isStaff) {
     return <div className="wrap narrow"><p className="meta">This conversation is private to the pair and program staff.</p></div>;
+  }
+  // Staff reads of a pair's conversation are part of the who-knew-what-when record.
+  if (isStaff && !isMember) {
+    await writeAudit({
+      actorId: user.id, action: "messages.read_by_staff", subjectType: "pairing",
+      subjectId: pairingId, metadata: { founder: founder.name, mentor: mentor.name },
+    });
   }
   const people = new Map([[founder.id, founder], [mentor.id, mentor]]);
   const other = user.id === founder.id ? mentor : founder;

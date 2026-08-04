@@ -17,6 +17,18 @@ export interface User {
   availability?: string;
   bookingLink?: string;
   capacity?: number;
+  status?: "active" | "inactive";
+}
+
+export interface AuditEntry {
+  id: string;
+  actorId: string | null;
+  actorName?: string;
+  action: string;
+  subjectType: string;
+  subjectId: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
 }
 
 export interface Cohort {

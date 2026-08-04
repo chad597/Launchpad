@@ -8,12 +8,14 @@ import {
 } from "./fixtures";
 import { computePairHealth, healthRank } from "./health";
 import type {
-  ActionItem, Flag, FounderSection, MatchSuggestion, Meeting, MeetingNote,
-  MentorSection, Message, PairHealth, Pairing, StatusFlag, User,
+  ActionItem, AuditEntry, Cohort, Flag, FounderSection, MatchSuggestion, Meeting,
+  MeetingNote, MentorSection, Message, PairHealth, Pairing, StatusFlag, User,
 } from "./types";
 
 interface Store {
   users: User[];
+  cohorts: Cohort[];
+  pool: { cohortId: string; mentorId: string }[];
   pairings: Pairing[];
   meetings: Meeting[];
   notes: MeetingNote[];
@@ -21,6 +23,7 @@ interface Store {
   messages: Message[];
   flags: Flag[];
   suggestions: MatchSuggestion[];
+  audit: AuditEntry[];
 }
 
 const g = globalThis as unknown as { __mentorStore?: Store };
@@ -28,7 +31,12 @@ const g = globalThis as unknown as { __mentorStore?: Store };
 function store(): Store {
   if (!g.__mentorStore) {
     g.__mentorStore = {
-      users: structuredClone(users),
+      users: structuredClone(users).map((u) => ({ ...u, status: "active" as const })),
+      cohorts: structuredClone(cohorts),
+      pool: structuredClone(users)
+        .filter((u) => u.role === "mentor")
+        .map((u) => ({ cohortId: cohorts[0].id, mentorId: u.id })),
+      audit: [],
       pairings: structuredClone(pairings),
       meetings: structuredClone(meetings),
       notes: structuredClone(meetingNotes),
@@ -54,7 +62,7 @@ export function getUsersByRole(role: User["role"]): User[] {
 }
 
 export function getCohort() {
-  return cohorts[0];
+  return store().cohorts.find((c) => c.status === "active") ?? store().cohorts[0];
 }
 
 export function weekNumber(): number {
@@ -216,6 +224,95 @@ export function raiseFlag(
 export function setAvailability(userId: string, availability: string, capacity: number) {
   const u = store().users.find((x) => x.id === userId);
   if (u) { u.availability = availability; u.capacity = capacity; }
+}
+
+// ---- admin ----
+
+export function listUsers(): User[] {
+  const order = { admin: 0, instructor: 1, mentor: 2, founder: 3 };
+  return [...store().users].sort(
+    (a, b) => order[a.role] - order[b.role] || a.name.localeCompare(b.name)
+  );
+}
+
+export function createUser(u: Omit<User, "id">): string {
+  const id = `u-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  store().users.push({ ...u, id, status: "active" });
+  return id;
+}
+
+export function updateUserRole(id: string, role: User["role"]) {
+  const u = store().users.find((x) => x.id === id);
+  if (u) u.role = role;
+}
+
+export function setUserStatus(id: string, status: "active" | "inactive") {
+  const u = store().users.find((x) => x.id === id);
+  if (u) u.status = status;
+}
+
+export function listCohorts(): Cohort[] {
+  return [...store().cohorts].sort((a, b) => b.startDate.localeCompare(a.startDate));
+}
+
+export function createCohort(c: Omit<Cohort, "id">): string {
+  const id = `c-${Date.now()}`;
+  store().cohorts.push({ ...c, id });
+  return id;
+}
+
+export function setCohortStatus(id: string, status: Cohort["status"]) {
+  const c = store().cohorts.find((x) => x.id === id);
+  if (c) c.status = status;
+}
+
+export function mentorPool(cohortId: string): string[] {
+  return store().pool.filter((p) => p.cohortId === cohortId).map((p) => p.mentorId);
+}
+
+export function setMentorPool(cohortId: string, mentorIds: string[]) {
+  const s = store();
+  s.pool = s.pool.filter((p) => p.cohortId !== cohortId);
+  for (const mentorId of mentorIds) s.pool.push({ cohortId, mentorId });
+}
+
+export function listPairings(cohortId: string): Pairing[] {
+  return store().pairings.filter((p) => p.cohortId === cohortId);
+}
+
+export function createPairing(
+  cohortId: string, founderId: string, mentorId: string,
+  cadence: Pairing["declaredCadence"], rationale: string
+) {
+  store().pairings.push({
+    id: `p-${Date.now()}`, cohortId, founderId, mentorId,
+    status: "active", declaredCadence: cadence, matchRationale: rationale,
+  });
+}
+
+export function updatePairing(
+  id: string, changes: { status?: Pairing["status"]; declaredCadence?: Pairing["declaredCadence"] }
+) {
+  const p = store().pairings.find((x) => x.id === id);
+  if (!p) return;
+  if (changes.status) p.status = changes.status;
+  if (changes.declaredCadence) p.declaredCadence = changes.declaredCadence;
+}
+
+export function writeAudit(e: Omit<AuditEntry, "id" | "createdAt">) {
+  store().audit.unshift({
+    ...e,
+    id: `au-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+export function listAudit(limit = 100): AuditEntry[] {
+  const users = store().users;
+  return store().audit.slice(0, limit).map((e) => ({
+    ...e,
+    actorName: users.find((u) => u.id === e.actorId)?.name,
+  }));
 }
 
 export function toggleActionItem(id: string) {

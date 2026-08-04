@@ -4,8 +4,8 @@ import { isDemo } from "./supabase/server";
 import * as demo from "./store";
 import * as db from "./db";
 import type {
-  ActionItem, Cohort, Flag, FounderSection, MatchSuggestion, Meeting, MeetingNote,
-  MentorSection, Message, PairHealth, Pairing, StatusFlag, User,
+  ActionItem, AuditEntry, Cohort, Flag, FounderSection, MatchSuggestion, Meeting,
+  MeetingNote, MentorSection, Message, PairHealth, Pairing, StatusFlag, User,
 } from "./types";
 
 export async function getUser(id: string): Promise<User | undefined> {
@@ -87,6 +87,57 @@ export async function raiseFlag(
 export async function setAvailability(userId: string, availability: string, capacity: number) {
   return isDemo() ? demo.setAvailability(userId, availability, capacity) : db.setAvailability(userId, availability, capacity);
 }
+// ---- admin ----
+export async function listUsers(): Promise<User[]> {
+  return isDemo() ? demo.listUsers() : db.listUsers();
+}
+export async function createUser(u: Omit<User, "id">): Promise<string> {
+  return isDemo() ? demo.createUser(u) : db.createUser(u);
+}
+export async function updateUserRole(id: string, role: User["role"]) {
+  return isDemo() ? demo.updateUserRole(id, role) : db.updateUserRole(id, role);
+}
+export async function setUserStatus(id: string, status: "active" | "inactive") {
+  return isDemo() ? demo.setUserStatus(id, status) : db.setUserStatus(id, status);
+}
+export async function listCohorts(): Promise<Cohort[]> {
+  return isDemo() ? demo.listCohorts() : db.listCohorts();
+}
+export async function createCohort(c: Omit<Cohort, "id">): Promise<string> {
+  return isDemo() ? demo.createCohort(c) : db.createCohort(c);
+}
+export async function setCohortStatus(id: string, status: Cohort["status"]) {
+  return isDemo() ? demo.setCohortStatus(id, status) : db.setCohortStatus(id, status);
+}
+export async function mentorPool(cohortId: string): Promise<string[]> {
+  return isDemo() ? demo.mentorPool(cohortId) : db.mentorPool(cohortId);
+}
+export async function setMentorPool(cohortId: string, mentorIds: string[]) {
+  return isDemo() ? demo.setMentorPool(cohortId, mentorIds) : db.setMentorPool(cohortId, mentorIds);
+}
+export async function listPairings(cohortId: string): Promise<Pairing[]> {
+  return isDemo() ? demo.listPairings(cohortId) : db.listPairings(cohortId);
+}
+export async function createPairing(
+  cohortId: string, founderId: string, mentorId: string,
+  cadence: Pairing["declaredCadence"], rationale: string
+) {
+  return isDemo()
+    ? demo.createPairing(cohortId, founderId, mentorId, cadence, rationale)
+    : db.createPairing(cohortId, founderId, mentorId, cadence, rationale);
+}
+export async function updatePairing(
+  id: string, changes: { status?: Pairing["status"]; declaredCadence?: Pairing["declaredCadence"] }
+) {
+  return isDemo() ? demo.updatePairing(id, changes) : db.updatePairing(id, changes);
+}
+export async function writeAudit(e: Omit<AuditEntry, "id" | "createdAt">) {
+  return isDemo() ? demo.writeAudit(e) : db.writeAudit(e);
+}
+export async function listAudit(limit = 100): Promise<AuditEntry[]> {
+  return isDemo() ? demo.listAudit(limit) : db.listAudit(limit);
+}
+
 export async function toggleActionItem(id: string) {
   return isDemo() ? demo.toggleActionItem(id) : db.toggleActionItem(id);
 }
