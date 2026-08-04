@@ -124,7 +124,8 @@ export async function postMessage(formData: FormData) {
   const pairing = await data.getPairing(pairingId);
   if (!pairing || (pairing.founderId !== user.id && pairing.mentorId !== user.id)) return;
   if (body) await data.sendMessage(pairingId, user.id, body);
-  revalidatePath(`/messages/${pairingId}`);
+  // The thread is on the home screens too, not only its own page.
+  revalidatePath("/", "layout");
 }
 
 // Everything the person typed, so a rejected note can be handed straight back.

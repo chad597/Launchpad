@@ -129,6 +129,12 @@ export default async function MentorHome() {
             <Link className="btn ghost" href="/mentor/availability">Edit availability</Link>
           </div>
           <div className="card">
+            <h2>Where action items come from</h2>
+            <p className="meta" style={{ margin: 0 }}>
+              Your half of the meeting note is the only place they are set. Whatever you write under Outcomes shows up on your founder&rsquo;s home screen and opens the next note, so the two of you pick up where you left off.
+            </p>
+          </div>
+          <div className="card">
             <h2>Seeing a pattern?</h2>
             <p className="meta" style={{ margin: "0 0 .6rem" }}>
               If the same risk keeps showing up across founders, or a match isn&rsquo;t clicking, tell us. You don&rsquo;t need to manage it alone.

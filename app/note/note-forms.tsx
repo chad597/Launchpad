@@ -144,6 +144,9 @@ export function MentorHalfForm({
           <div className="formrow"><label htmlFor="decisionMade">Decision made (optional)</label>
             <input type="text" id="decisionMade" name="decisionMade" defaultValue={text(v, "decisionMade")} /></div>
           <div className="formrow"><span className="label">Action items</span>
+            <p className="help" style={{ marginTop: 0 }}>
+              These three rows are where action items come from. What you write here lands on {founderFirst}&rsquo;s home screen, and it opens the next note as a checklist you both review together. Leave them blank and the pair has nothing to track between meetings.
+            </p>
             {[0, 1, 2].map((i) => (
               <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: ".5rem", marginBottom: ".5rem" }}>
                 <input type="text" name={`action_${i}`} defaultValue={text(v, `action_${i}`)}

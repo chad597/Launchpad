@@ -4,7 +4,8 @@ import {
   actionItemsForPairing, currentTime, getUser, messagesForPairing,
   meetingsForPairing, nextMeetingForPairing, noteForMeeting, pairingsForUser,
 } from "@/lib/data";
-import { bookMeeting, markActionItem } from "../actions";
+import { bookMeeting, markActionItem, postMessage } from "../actions";
+import { Thread, type ThreadMessage } from "./thread";
 
 function fmt(dt: string) {
   return new Date(dt).toLocaleString("en-US", {
@@ -36,10 +37,18 @@ export default async function FounderHome({
   const noteDue = next ? new Date(new Date(next.scheduledAt).getTime() - 24 * 3600 * 1000) : null;
   const minutesLeft = noteDue ? Math.round((noteDue.getTime() - now.getTime()) / 60000) : null;
   const openItems = items.filter((a) => a.status === "open");
-  const msgs = allMsgs.slice(-2);
   const notes = await Promise.all(meetings.map((m) => noteForMeeting(m.id)));
   const confidences = notes.filter((n) => n?.confidence != null).map((n) => n!.confidence!);
   const people = new Map([[user.id, user], [mentor.id, mentor]]);
+  const thread: ThreadMessage[] = allMsgs.map((m) => {
+    const sender = people.get(m.senderId);
+    return {
+      id: m.id, body: m.body, createdAt: fmt(m.createdAt),
+      senderInitials: (sender?.name ?? "?").split(" ").map((w) => w[0]).join(""),
+      senderFirst: sender?.name.split(" ")[0] ?? "…",
+      mine: m.senderId === user.id,
+    };
+  });
 
   return (
     <div className="wrap">
@@ -54,6 +63,19 @@ export default async function FounderHome({
       {error && <div className="banner bad">{error}</div>}
       <div className="grid two">
         <div>
+          <div className="card">
+            <h2>Conversation with {mentor.name}</h2>
+            <p className="meta" style={{ margin: "0 0 .6rem" }}>
+              You do not have to wait for the next meeting. Ask here whenever something comes up.
+            </p>
+            <Thread
+              messages={thread}
+              pairingId={pairing.id}
+              otherFirst={mentor.name.split(" ")[0]}
+              action={postMessage}
+            />
+            <div className="notice">Program staff can access conversations for safety and program quality.</div>
+          </div>
           <div className="card">
             <h2>Next meeting</h2>
             {next ? (
@@ -107,21 +129,6 @@ export default async function FounderHome({
             {openItems.length === 0 && items.length > 0 && (
               <p className="meta" style={{ margin: ".4rem 0 0" }}>All done. They&rsquo;ll show up checked off in your next note.</p>
             )}
-          </div>
-          <div className="card">
-            <h2>Messages · {mentor.name}</h2>
-            {msgs.map((m) => {
-              const sender = people.get(m.senderId);
-              const mine = m.senderId === user.id;
-              return (
-                <div className="msg" key={m.id}>
-                  <span className={`avatar${mine ? " o" : ""}`}>{(sender?.name ?? "?").split(" ").map((w) => w[0]).join("")}</span>
-                  <div><div className="bubble">{m.body}</div><div className="t">{fmt(m.createdAt)}</div></div>
-                </div>
-              );
-            })}
-            <Link className="btn ghost" href={`/messages/${pairing.id}`}>Open conversation</Link>
-            <div className="notice">Program staff can access conversations for safety and program quality.</div>
           </div>
         </div>
         <div>
