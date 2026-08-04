@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { currentUser } from "@/lib/session";
 import {
   cohortHealthBoard, getCohort, getUser, openFlags, suggestionsForFounder, weekNumber,
@@ -43,7 +44,9 @@ export default async function AdminHome() {
     <div className="wrap">
       <AdminNav current="/admin" />
       <h1 className="page">{cohort.ecosystem} · {cohort.name}</h1>
-      <p className="sub">Week {week} of 12 · {board.length} active pairings · started {fmtDay(cohort.startDate + "T12:00:00Z")}</p>
+      <p className="sub">
+        Week {week} of 12 · {board.length} active pairings · started {fmtDay(cohort.startDate + "T12:00:00Z")}. Open a pair to read their notes and conversation.
+      </p>
 
       <div className="stat-row">
         <div className="stat"><div className="n">{board.length}</div><div className="l">Active pairings</div><div className="d" style={{ color: "var(--good)" }}>All matched in week 3</div></div>
@@ -61,7 +64,11 @@ export default async function AdminHome() {
             {board.map((b) => (
               <tr key={b.pairing.id}>
                 <td className={`stripe ${b.health}`}></td>
-                <td>{b.founder.name.split(" ").pop()} · {b.mentor.name.split(" ").pop()}</td>
+                <td>
+                  <Link href={`/admin/pairings/${b.pairing.id}`}>
+                    {b.founder.name.split(" ").pop()} · {b.mentor.name.split(" ").pop()}
+                  </Link>
+                </td>
                 <td><span className={`pill ${HEALTH_PILL[b.health]}`}>{HEALTH_LABEL[b.health]}</span></td>
                 <td>{b.lastMetDaysAgo != null ? `${b.lastMetDaysAgo} days ago` : "Never"}</td>
                 <td>{b.nextMeeting ? fmtDay(b.nextMeeting.scheduledAt) : "None booked"}</td>

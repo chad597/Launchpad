@@ -554,13 +554,13 @@ export async function addPairing(formData: FormData) {
   const founderId = String(formData.get("founderId"));
   const mentorId = String(formData.get("mentorId"));
   if (!founderId || !mentorId) redirect("/admin/pairings?error=Pick both a founder and a mentor");
-  const cadence = String(formData.get("cadence") ?? "biweekly") as
-    "weekly" | "biweekly" | "monthly" | "as_needed";
+  // The pair decides how often they meet, so a new pairing starts with no
+  // declared cadence rather than one the program picked for them.
   const rationale = String(formData.get("rationale") ?? "").trim();
-  await data.createPairing(cohortId, founderId, mentorId, cadence, rationale);
+  await data.createPairing(cohortId, founderId, mentorId, "as_needed", rationale);
   await data.writeAudit({
     actorId: admin.id, action: "pairing.created", subjectType: "pairing", subjectId: null,
-    metadata: { founderId, mentorId, cadence },
+    metadata: { founderId, mentorId },
   });
   revalidatePath("/", "layout");
   redirect("/admin/pairings");

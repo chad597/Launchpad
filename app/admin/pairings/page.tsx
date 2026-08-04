@@ -62,7 +62,7 @@ export default async function PairingsPage({
           <tbody>
             {pairings.map((p) => (
               <tr key={p.id} style={p.status === "dissolved" ? { opacity: 0.55 } : undefined}>
-                <td>{byId.get(p.founderId)?.name ?? "—"}</td>
+                <td><Link href={`/admin/pairings/${p.id}`}>{byId.get(p.founderId)?.name ?? "—"}</Link></td>
                 <td>{byId.get(p.mentorId)?.name ?? "—"}</td>
                 <td>
                   <form action={changePairing} className="inline-form">
@@ -97,11 +97,11 @@ export default async function PairingsPage({
       <div className="card" style={{ marginTop: "1.25rem" }}>
         <h2>Pair manually</h2>
         <p className="meta" style={{ margin: "0 0 .7rem" }}>
-          For matches you make outside the shortlist, or a second mentor for a founder who needs one.
+          For matches you make outside the shortlist, or a second mentor for a founder who needs one. The pair sets their own meeting cadence at kickoff.
         </p>
         <form action={addPairing}>
           <input type="hidden" name="cohortId" value={cohort.id} />
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: ".8rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".8rem" }}>
             <div className="formrow"><label htmlFor="founderId">Founder</label>
               <select id="founderId" name="founderId" required defaultValue="">
                 <option value="" disabled>Choose a founder</option>
@@ -124,11 +124,6 @@ export default async function PairingsPage({
                     </option>
                   );
                 })}
-              </select>
-            </div>
-            <div className="formrow"><label htmlFor="cadence">Cadence</label>
-              <select id="cadence" name="cadence" defaultValue="biweekly">
-                {CADENCES.map((c) => <option key={c} value={c}>{CADENCE_LABEL[c]}</option>)}
               </select>
             </div>
           </div>
