@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { currentUser } from "@/lib/session";
 import { listForms } from "@/lib/forms";
-import { AdminNav } from "../nav";
 
 export default async function FormsIndex() {
   const user = await currentUser();
@@ -12,7 +11,6 @@ export default async function FormsIndex() {
 
   return (
     <div className="wrap">
-      <AdminNav current="/admin/forms" />
       <h1 className="page">Intake forms</h1>
       <p className="sub">
         Edit the questions people answer. Changes are live immediately, and answers already collected keep their meaning because every question has a fixed key behind the label.

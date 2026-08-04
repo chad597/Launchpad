@@ -1,6 +1,5 @@
 import { currentUser } from "@/lib/session";
 import { listAudit } from "@/lib/data";
-import { AdminNav } from "../nav";
 
 const LABEL: Record<string, string> = {
   "person.created": "Added a person",
@@ -39,7 +38,6 @@ export default async function AuditPage() {
 
   return (
     <div className="wrap">
-      <AdminNav current="/admin/audit" />
       <h1 className="page">Audit log</h1>
       <p className="sub">
         Who did what, and when. Entries are written automatically and cannot be edited or removed, including staff access to a pair&rsquo;s conversation.

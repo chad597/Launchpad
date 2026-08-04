@@ -5,7 +5,6 @@ import {
 } from "@/lib/data";
 import { meetingRhythmDays } from "@/lib/health";
 import { addPairing, changePairing } from "../../actions";
-import { AdminNav } from "../nav";
 
 const STATUSES = ["proposed", "active", "paused", "completed", "dissolved"] as const;
 const STATUS_PILL = {
@@ -46,7 +45,6 @@ export default async function PairingsPage({
 
   return (
     <div className="wrap">
-      <AdminNav current="/admin/pairings" />
       <h1 className="page">Pairings · {cohort.name}</h1>
       <p className="sub">
         Every pairing in this cohort, including ended ones. Dissolving a pairing keeps its whole history; it does not delete the record.

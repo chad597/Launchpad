@@ -4,7 +4,6 @@ import {
   cohortHealthBoard, getCohort, getUser, openFlags, suggestionsForFounder, weekNumber,
 } from "@/lib/data";
 import { closeFlag, selectMatch } from "../actions";
-import { AdminNav } from "./nav";
 import type { User } from "@/lib/types";
 
 const HEALTH_PILL = { healthy: "good", watch: "warn", attention: "crit" } as const;
@@ -42,7 +41,6 @@ export default async function AdminHome() {
 
   return (
     <div className="wrap">
-      <AdminNav current="/admin" />
       <h1 className="page">{cohort.ecosystem} · {cohort.name}</h1>
       <p className="sub">
         Week {week} of 12 · {board.length} active pairings · started {fmtDay(cohort.startDate + "T12:00:00Z")}. Open a pair to read their notes and conversation.

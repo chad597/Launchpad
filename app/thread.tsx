@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 
-// The conversation sits open on the founder's home screen rather than behind a
-// link, because it is the thing they can use the moment they sign in, on any
-// day, meeting or not.
+// The conversation sits open on the home screen rather than behind a link,
+// because it is the thing either side can use the moment they sign in, on any
+// day, meeting or not. Shared by the founder and the mentor.
 export interface ThreadMessage {
   id: string;
   body: string;
@@ -24,10 +24,20 @@ export function Thread({
 }) {
   const scroller = useRef<HTMLDivElement>(null);
 
-  // Newest message at the bottom, in view, without the founder scrolling.
-  useEffect(() => {
+  // Newest message in view without anyone scrolling. Setting scrollTop once on
+  // mount was unreliable: the panel is often still being laid out, and a
+  // hydrated page can run this before the text has its final height. Pin it
+  // after layout, then again on the next frame once everything has settled.
+  useLayoutEffect(() => {
     const el = scroller.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    const pin = () => { el.scrollTop = el.scrollHeight; };
+    pin();
+    const frame = requestAnimationFrame(pin);
+    // Late reflows (web fonts, a long message wrapping) move the bottom again.
+    const observer = new ResizeObserver(pin);
+    observer.observe(el);
+    return () => { cancelAnimationFrame(frame); observer.disconnect(); };
   }, [messages.length]);
 
   return (

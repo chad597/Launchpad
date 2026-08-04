@@ -7,6 +7,7 @@ import { getUser as demoGetUser } from "@/lib/store";
 import { getUserByAuth } from "@/lib/db";
 import { getCohort, weekNumber } from "@/lib/data";
 import { signOut, switchIdentity } from "./actions";
+import { MainNav } from "./nav";
 import { cookies } from "next/headers";
 import type { User } from "@/lib/types";
 
@@ -65,6 +66,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en">
       <body>
         {bar}
+        {user && <MainNav role={user.role} />}
         {children}
       </body>
     </html>

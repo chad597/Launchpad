@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { currentUser } from "@/lib/session";
 import { getFormForEditing } from "@/lib/forms";
 import { QUESTION_TYPES } from "@/lib/mentor-form";
-import { AdminNav } from "../../nav";
 import {
   createQuestion, editFormCopy, editQuestion, removeQuestion, reorderQuestion, restoreQuestion,
 } from "../../../actions";
@@ -30,7 +29,6 @@ export default async function FormEditor({
 
   return (
     <div className="wrap">
-      <AdminNav current="/admin/forms" />
       <p className="meta"><Link href="/admin/forms">All forms</Link></p>
       <h1 className="page">{form.name}</h1>
       <p className="sub">{live.length} live questions. Every answer is stored against the question&rsquo;s key, so renaming a label never loses data.</p>

@@ -3,7 +3,6 @@ import { currentUser } from "@/lib/session";
 import { listUsers } from "@/lib/data";
 import { canIssueInvites } from "@/lib/supabase/admin";
 import { addPerson, changeRole, changeStatus, createInviteLink } from "../../actions";
-import { AdminNav } from "../nav";
 import { InviteLinkBanner } from "./invite-link";
 
 const ROLES = ["founder", "mentor", "admin"] as const;
@@ -30,7 +29,6 @@ export default async function PeoplePage({
 
   return (
     <div className="wrap">
-      <AdminNav current="/admin/people" />
       <h1 className="page">People</h1>
       <p className="sub">
         Everyone with access to the app. Adding someone here creates their account. Then send them a sign-in link and they choose their own password. The email must match the one they will sign in with.

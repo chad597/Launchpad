@@ -128,6 +128,14 @@ export async function postMessage(formData: FormData) {
   revalidatePath("/", "layout");
 }
 
+// A note can be filled in from the home screen or from its own page, so it
+// returns to wherever it was submitted. Only internal paths, never a URL
+// someone posted in.
+function safeReturn(formData: FormData, fallback: string): string {
+  const to = String(formData.get("returnTo") ?? "");
+  return to.startsWith("/") && !to.startsWith("//") ? to : fallback;
+}
+
 // Everything the person typed, so a rejected note can be handed straight back.
 function echo(formData: FormData, keys: string[]): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -201,7 +209,7 @@ export async function completeMentorHalf(
     }
   );
   revalidatePath("/", "layout");
-  redirect(`/note/${meetingId}`);
+  redirect(safeReturn(formData, `/note/${meetingId}`));
 }
 
 const FOUNDER_HALF_FIELDS = [
@@ -269,7 +277,7 @@ export async function submitFounderHalf(
   }
 
   revalidatePath("/", "layout");
-  redirect(`/note/${meetingId}`);
+  redirect(safeReturn(formData, `/note/${meetingId}`));
 }
 
 export async function bookMeeting(formData: FormData) {

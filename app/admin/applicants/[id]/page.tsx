@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { currentUser } from "@/lib/session";
 import { getApplication, getFormForEditing } from "@/lib/forms";
 import { answerToText } from "@/lib/mentor-form";
-import { AdminNav } from "../../nav";
 import { reviewApplicant } from "../../../actions";
 
 const STATUS_PILL = { new: "info", reviewing: "warn", accepted: "good", declined: "crit" } as const;
@@ -19,9 +18,7 @@ export default async function ApplicantDetail({ params }: { params: Promise<{ id
   const questions = (form?.questions ?? []).filter((q) => q.type !== "statement");
 
   return (
-    <div className="wrap narrow">
-      <AdminNav current="/admin/applicants" />
-      <p className="meta"><Link href="/admin/applicants">All applicants</Link></p>
+    <div className="wrap narrow">      <p className="meta"><Link href="/admin/applicants">All applicants</Link></p>
       <h1 className="page">{app.name}</h1>
       <p className="sub">
         <span className={`pill ${STATUS_PILL[app.status]}`}>{app.status}</span>{" "}

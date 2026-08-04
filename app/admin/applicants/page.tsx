@@ -2,7 +2,6 @@ import Link from "next/link";
 import { currentUser } from "@/lib/session";
 import { getFormForEditing, listApplications } from "@/lib/forms";
 import { answerToText } from "@/lib/mentor-form";
-import { AdminNav } from "../nav";
 
 const STATUSES = ["new", "reviewing", "accepted", "declined"] as const;
 const STATUS_PILL = { new: "info", reviewing: "warn", accepted: "good", declined: "crit" } as const;
@@ -37,7 +36,6 @@ export default async function ApplicantsPage({
 
   return (
     <div className="wrap">
-      <AdminNav current="/admin/applicants" />
       <h1 className="page">Potential mentors</h1>
       <p className="sub">
         Everyone who has applied at <code>/apply</code>. Accepting someone creates their mentor account and sends them to the profile form at first sign-in.

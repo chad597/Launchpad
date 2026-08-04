@@ -1,7 +1,6 @@
 import { currentUser } from "@/lib/session";
 import { listCohorts, listPairings, listUsers, mentorPool } from "@/lib/data";
 import { addCohort, changeCohortStatus, saveMentorPool } from "../../actions";
-import { AdminNav } from "../nav";
 
 function weekOf(startDate: string) {
   const start = new Date(startDate + "T00:00:00.000Z").getTime();
@@ -27,7 +26,6 @@ export default async function CohortsPage({
 
   return (
     <div className="wrap">
-      <AdminNav current="/admin/cohorts" />
       <h1 className="page">Cohorts</h1>
       <p className="sub">
         A cohort runs 12 weeks from its start date, and every deadline in the app counts from there. Matching opens in week 3.

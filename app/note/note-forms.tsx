@@ -28,13 +28,15 @@ export interface PriorItem {
 }
 
 export function FounderHalfForm({
-  meetingId, mentorFirst, dueLabel, priorItems, action,
+  meetingId, mentorFirst, dueLabel, priorItems, action, returnTo, embedded = false,
 }: {
   meetingId: string;
   mentorFirst: string;
   dueLabel: string;
   priorItems: PriorItem[];
   action: Action;
+  returnTo?: string;
+  embedded?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, EMPTY_FORM_STATE);
   const v = state.values;
@@ -46,7 +48,8 @@ export function FounderHalfForm({
       {state.error && <div className="banner bad" role="alert">{state.error}</div>}
       <form key={state.attempt} action={formAction}>
         <input type="hidden" name="meetingId" value={meetingId} />
-        <div className="card" style={{ borderColor: "var(--teal)" }}>
+        {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
+        <div className={embedded ? "" : "card"} style={embedded ? undefined : { borderColor: "var(--teal)" }}>
           <div className="half-head">
             <h3>Your half</h3>
             <span className="pill warn">Due {dueLabel}</span>
@@ -104,7 +107,7 @@ export function FounderHalfForm({
 }
 
 export function MentorHalfForm({
-  meetingId, mentorFirst, founderFirst, founderId, mentorId, action,
+  meetingId, mentorFirst, founderFirst, founderId, mentorId, action, returnTo, embedded = false,
 }: {
   meetingId: string;
   mentorFirst: string;
@@ -112,6 +115,8 @@ export function MentorHalfForm({
   founderId: string;
   mentorId: string;
   action: Action;
+  returnTo?: string;
+  embedded?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, EMPTY_FORM_STATE);
   const v = state.values;
@@ -121,7 +126,8 @@ export function MentorHalfForm({
       {state.error && <div className="banner bad" role="alert" style={{ marginTop: "1rem" }}>{state.error}</div>}
       <form key={state.attempt} action={formAction}>
         <input type="hidden" name="meetingId" value={meetingId} />
-        <div className="card" style={{ marginTop: "1rem", borderColor: "var(--teal)" }}>
+        {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
+        <div className={embedded ? "" : "card"} style={embedded ? undefined : { marginTop: "1rem", borderColor: "var(--teal)" }}>
           <div className="half-head">
             <h3>{mentorFirst}&rsquo;s half</h3>
             <span className="pill warn">In progress · submit to complete the record</span>
@@ -137,7 +143,7 @@ export function MentorHalfForm({
           <div className="formrow"><label htmlFor="take">My take</label>
             <textarea id="take" name="take" defaultValue={text(v, "take")} required /></div>
         </div>
-        <div className="card" style={{ marginTop: "1rem", borderColor: "var(--orange)" }}>
+        <div className={embedded ? "" : "card"} style={{ marginTop: "1rem", ...(embedded ? {} : { borderColor: "var(--orange)" }) }}>
           <div className="half-head"><h3>Outcomes</h3><span className="pill info">Closed together, at the end of the meeting</span></div>
           <div className="formrow"><label htmlFor="keyInsight">Key insight</label>
             <input type="text" id="keyInsight" name="keyInsight" defaultValue={text(v, "keyInsight")} /></div>

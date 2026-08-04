@@ -4,8 +4,9 @@ import {
   actionItemsForPairing, currentTime, getUser, messagesForPairing,
   meetingsForPairing, nextMeetingForPairing, noteForMeeting, pairingsForUser,
 } from "@/lib/data";
-import { bookMeeting, markActionItem, postMessage } from "../actions";
-import { Thread, type ThreadMessage } from "./thread";
+import { bookMeeting, markActionItem, postMessage, submitFounderHalf } from "../actions";
+import { Thread, type ThreadMessage } from "../thread";
+import { FounderHalfForm, type PriorItem } from "../note/note-forms";
 
 function fmt(dt: string) {
   return new Date(dt).toLocaleString("en-US", {
@@ -40,6 +41,17 @@ export default async function FounderHome({
   const notes = await Promise.all(meetings.map((m) => noteForMeeting(m.id)));
   const confidences = notes.filter((n) => n?.confidence != null).map((n) => n!.confidence!);
   const people = new Map([[user.id, user], [mentor.id, mentor]]);
+  // Items agreed at meetings before this one, which the note rolls forward.
+  const earlier = new Set(
+    next ? meetings.filter((m) => m.scheduledAt < next.scheduledAt).map((m) => m.id) : []
+  );
+  const priorItems: PriorItem[] = items
+    .filter((a) => earlier.has(a.meetingId))
+    .map((a) => ({
+      id: a.id, description: a.description, dueDate: a.dueDate,
+      ownerFirst: (a.ownerId === user.id ? user.name : mentor.name).split(" ")[0],
+      done: a.status === "done",
+    }));
   const thread: ThreadMessage[] = allMsgs.map((m) => {
     const sender = people.get(m.senderId);
     return {
@@ -84,12 +96,27 @@ export default async function FounderHome({
                 <div className="meta">1:1 with {mentor.name} · Google Meet</div>
                 <hr className="divider" />
                 {nextNote?.founderSubmittedAt ? (
-                  <span className="pill good">Your half is submitted</span>
+                  <>
+                    <span className="pill good">Your half is in</span>{" "}
+                    <Link className="linklike" href={`/note/${next.id}`}>Read the whole note</Link>
+                    <div className="notice">{mentor.name.split(" ")[0]} reads it before you meet, so the time goes to the conversation instead of a recap.</div>
+                  </>
                 ) : (
-                  <Link className="btn" href={`/note/${next.id}`}>Complete your half of the note</Link>
-                )}{" "}
-                <Link className="btn ghost" href={`/note/${next.id}`}>Open the note</Link>
-                <div className="notice">{mentor.name.split(" ")[0]} reads your note before you meet, so the time goes to the conversation instead of a recap.</div>
+                  <>
+                    <p className="meta" style={{ margin: "0 0 .6rem" }}>
+                      {mentor.name.split(" ")[0]} reads this before you meet, so fill it in here whenever you have a minute. It saves when you share it.
+                    </p>
+                    <FounderHalfForm
+                      meetingId={next.id}
+                      mentorFirst={mentor.name.split(" ")[0]}
+                      dueLabel={fmt(noteDue!.toISOString())}
+                      priorItems={priorItems}
+                      action={submitFounderHalf}
+                      returnTo="/founder"
+                      embedded
+                    />
+                  </>
+                )}
               </>
             ) : (
               <>

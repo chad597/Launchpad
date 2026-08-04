@@ -6,7 +6,6 @@ import {
   messagesForPairing, noteForMeeting, openFlags, writeAudit,
 } from "@/lib/data";
 import { computePairHealth } from "@/lib/health";
-import { AdminNav } from "../../nav";
 import type { MeetingNote } from "@/lib/types";
 
 const HEALTH_PILL = { healthy: "good", watch: "warn", attention: "crit" } as const;
@@ -75,7 +74,6 @@ export default async function PairingDetail({ params }: { params: Promise<{ id: 
 
   return (
     <div className="wrap">
-      <AdminNav current="/admin/pairings" />
       <p className="meta" style={{ margin: "0 0 .3rem" }}>
         <Link className="linklike" href="/admin">Health board</Link> · <Link className="linklike" href="/admin/pairings">All pairings</Link>
       </p>
