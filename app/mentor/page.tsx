@@ -115,7 +115,7 @@ export default async function MentorHome() {
           <div className="card">
             <h2>Availability &amp; capacity</h2>
             <p className="meta" style={{ margin: "0 0 .5rem" }}>
-              {user.availability ? `Usually free: ${user.availability}` : "No availability set yet"} · {views.length} of {user.capacity ?? 2} founders
+              {user.availability ? `Usually free: ${user.availability}` : "No availability set yet"} · {views.length} of {user.capacity ?? 1} founders
             </p>
             <Link className="btn ghost" href="/mentor/availability">Edit availability</Link>
           </div>

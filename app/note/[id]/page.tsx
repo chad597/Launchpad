@@ -4,6 +4,7 @@ import {
   actionItemsForPairing, getMeeting, getPairing, getUser, meetingsForPairing, noteForMeeting,
 } from "@/lib/data";
 import { completeMentorHalf, submitFounderHalf } from "../../actions";
+import { FounderHalfForm, MentorHalfForm, type PriorItem } from "../note-forms";
 
 const STATUS_LABEL = { on_track: "On track", at_risk: "At risk", off_track: "Off track" } as const;
 const STATUS_PILL = { on_track: "good", at_risk: "warn", off_track: "crit" } as const;
@@ -15,13 +16,11 @@ function fmt(dt: string) {
 }
 
 export default async function NotePage({
-  params, searchParams,
+  params,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
 }) {
   const { id } = await params;
-  const { error } = await searchParams;
   const user = await currentUser();
   const meeting = await getMeeting(id);
   if (!meeting) notFound();
@@ -61,6 +60,13 @@ export default async function NotePage({
   const canFinish = isMentor && fs && !note?.mentorSubmittedAt;
   const canWriteFounderHalf = isFounder && !note?.founderSubmittedAt;
   const dueAt = new Date(new Date(meeting.scheduledAt).getTime() - 24 * 3600 * 1000);
+  const priorItemViews: PriorItem[] = priorItems.map((a) => ({
+    id: a.id,
+    description: a.description,
+    ownerFirst: people.get(a.ownerId)?.name.split(" ")[0] ?? "…",
+    dueDate: a.dueDate,
+    done: a.status === "done",
+  }));
 
   return (
     <div className="wrap narrow">
@@ -68,61 +74,14 @@ export default async function NotePage({
       <p className="sub">
         {founder.name} ({founder.company}) with {mentor.name} · {fmt(meeting.scheduledAt)} · Both of you see this whole note. No surprises on either side.
       </p>
-      {error && <div className="banner bad">{error}</div>}
-
       {canWriteFounderHalf ? (
-        <form action={submitFounderHalf}>
-          <input type="hidden" name="meetingId" value={meeting.id} />
-          <div className="card" style={{ borderColor: "var(--teal)" }}>
-            <div className="half-head">
-              <h3>Your half</h3>
-              <span className="pill warn">Due {fmt(dueAt.toISOString())}</span>
-            </div>
-            <p className="meta" style={{ marginTop: 0 }}>
-              {mentor.name.split(" ")[0]} reads this before you meet, so the meeting can start as a conversation. Be honest rather than optimistic; a flat 7 every week helps no one.
-            </p>
-            {priorItems.length > 0 && (
-              <div className="formrow"><span className="label">Last meeting&rsquo;s action items</span>
-                <ul className="bare">
-                  {priorItems.map((a) => (
-                    <li key={a.id}>
-                      <label style={{ display: "inline", textTransform: "none", letterSpacing: 0, fontWeight: 400, fontSize: ".87rem", color: "var(--ink)" }}>
-                        <input type="checkbox" name="done" value={a.id} defaultChecked={a.status === "done"} style={{ width: "auto", marginRight: ".4rem" }} />
-                        {a.description} <span className="meta">({people.get(a.ownerId)?.name.split(" ")[0] ?? "…"}, due {a.dueDate})</span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".8rem" }}>
-              <div className="formrow"><label htmlFor="statusFlag">Status</label>
-                <select id="statusFlag" name="statusFlag" defaultValue="on_track">
-                  <option value="on_track">On track</option>
-                  <option value="at_risk">At risk</option>
-                  <option value="off_track">Off track</option>
-                </select>
-              </div>
-              <div className="formrow"><label htmlFor="confidence">Confidence (1 to 10)</label>
-                <input type="text" inputMode="numeric" id="confidence" name="confidence" defaultValue="6" />
-              </div>
-            </div>
-            <div className="formrow"><label htmlFor="whatMoved">What moved (one per line)</label>
-              <textarea id="whatMoved" name="whatMoved" placeholder="What you actually did. Conversations had, tests run, things built." required />
-            </div>
-            <div className="formrow"><label htmlFor="changedThinking">What changed your thinking this week?</label>
-              <textarea id="changedThinking" name="changedThinking" placeholder="An assumption that broke, a pattern you noticed, a decision you now see differently." />
-            </div>
-            <div className="formrow"><label htmlFor="needHelp">Where I need help</label>
-              <textarea id="needHelp" name="needHelp" placeholder="One or two specific things tied to what this mentor knows." required />
-            </div>
-            <div className="formrow"><label htmlFor="focusNextWeek">My focus for next week (one per line)</label>
-              <textarea id="focusNextWeek" name="focusNextWeek" placeholder="Your best guess. Your mentor will confirm, sharpen, or redirect it." />
-            </div>
-            <button className="btn" type="submit">Share with {mentor.name.split(" ")[0]}</button>
-            <div className="notice">Once you share it, {mentor.name.split(" ")[0]} can read it and add their half. You&rsquo;ll both see the whole note.</div>
-          </div>
-        </form>
+        <FounderHalfForm
+          meetingId={meeting.id}
+          mentorFirst={mentor.name.split(" ")[0]}
+          dueLabel={fmt(dueAt.toISOString())}
+          priorItems={priorItemViews}
+          action={submitFounderHalf}
+        />
       ) : (
       <div className="card">
         <div className="half-head">
@@ -164,46 +123,14 @@ export default async function NotePage({
       )}
 
       {canFinish ? (
-        <form action={completeMentorHalf}>
-          <input type="hidden" name="meetingId" value={meeting.id} />
-          <div className="card" style={{ marginTop: "1rem", borderColor: "var(--teal)" }}>
-            <div className="half-head">
-              <h3>{mentor.name.split(" ")[0]}&rsquo;s half</h3>
-              <span className="pill warn">In progress · submit to complete the record</span>
-            </div>
-            <div className="formrow"><label htmlFor="read">Read: does the self-assessment match what you saw?</label>
-              <textarea id="read" name="read" required /></div>
-            <div className="formrow"><label htmlFor="seeing">What I&rsquo;m seeing (one per line)</label>
-              <textarea id="seeing" name="seeing" /></div>
-            <div className="formrow"><label htmlFor="risks">Risks (one per line)</label>
-              <textarea id="risks" name="risks" /></div>
-            <div className="formrow"><label htmlFor="focus">Focus for next week, adjustments (one per line)</label>
-              <textarea id="focus" name="focus" /></div>
-            <div className="formrow"><label htmlFor="take">My take</label>
-              <textarea id="take" name="take" required /></div>
-          </div>
-          <div className="card" style={{ marginTop: "1rem", borderColor: "var(--orange)" }}>
-            <div className="half-head"><h3>Outcomes</h3><span className="pill info">Closed together, at the end of the meeting</span></div>
-            <div className="formrow"><label htmlFor="keyInsight">Key insight</label>
-              <input type="text" id="keyInsight" name="keyInsight" /></div>
-            <div className="formrow"><label htmlFor="decisionMade">Decision made (optional)</label>
-              <input type="text" id="decisionMade" name="decisionMade" /></div>
-            <div className="formrow"><span className="label">Action items</span>
-              {[0, 1, 2].map((i) => (
-                <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: ".5rem", marginBottom: ".5rem" }}>
-                  <input type="text" name={`action_${i}`} placeholder="What happens next" aria-label={`Action ${i + 1}`} />
-                  <select name={`action_owner_${i}`} aria-label={`Owner for action ${i + 1}`}>
-                    <option value={founder.id}>{founder.name.split(" ")[0]}</option>
-                    <option value={mentor.id}>{mentor.name.split(" ")[0]}</option>
-                  </select>
-                  <input type="date" name={`action_due_${i}`} aria-label={`Due date for action ${i + 1}`} />
-                </div>
-              ))}
-            </div>
-            <button className="btn" type="submit">Submit the finished note</button>
-            <div className="notice">Submitting marks the meeting complete and sends the full note to {founder.name.split(" ")[0]}. Open action items appear on their home screen and start the next note.</div>
-          </div>
-        </form>
+        <MentorHalfForm
+          meetingId={meeting.id}
+          mentorFirst={mentor.name.split(" ")[0]}
+          founderFirst={founder.name.split(" ")[0]}
+          founderId={founder.id}
+          mentorId={mentor.id}
+          action={completeMentorHalf}
+        />
       ) : (
         <div className="card" style={{ marginTop: "1rem", borderColor: ms ? "var(--line)" : "var(--teal)" }}>
           <div className="half-head">

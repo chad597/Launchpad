@@ -2,8 +2,11 @@ import type { FormQuestion } from "@/lib/mentor-form";
 
 // Renders one question as form inputs. Shared by the public application and
 // the mentor profile form so both always match the stored definition.
-export function Field({ q }: { q: FormQuestion }) {
+// `defaults` carries answers back after a failed submit so nobody has to
+// retype what they already filled in.
+export function Field({ q, defaults }: { q: FormQuestion; defaults?: Record<string, unknown> }) {
   const id = `f_${q.key}`;
+  const prior = defaults?.[q.key];
 
   if (q.type === "statement") {
     return (
@@ -21,7 +24,8 @@ export function Field({ q }: { q: FormQuestion }) {
           <p className="meta" key={i} style={{ margin: "0 0 .5rem" }}>{para}</p>
         ))}
         <label className="checkline">
-          <input type="checkbox" id={id} name={q.key} value="yes" required={q.required} />
+          <input type="checkbox" id={id} name={q.key} value="yes" required={q.required}
+            defaultChecked={prior === true} />
           <span>{q.label}{q.required && " *"}</span>
         </label>
       </div>
@@ -36,13 +40,13 @@ export function Field({ q }: { q: FormQuestion }) {
   );
 
   if (q.type === "long_text") {
-    return <div className="formrow">{labelEl}<textarea id={id} name={q.key} required={q.required} style={{ minHeight: "6.5rem" }} /></div>;
+    return <div className="formrow">{labelEl}<textarea id={id} name={q.key} required={q.required} defaultValue={asText(prior)} style={{ minHeight: "6.5rem" }} /></div>;
   }
 
   if (q.type === "dropdown") {
     return (
       <div className="formrow">{labelEl}
-        <select id={id} name={q.key} required={q.required} defaultValue="">
+        <select id={id} name={q.key} required={q.required} defaultValue={asText(prior)}>
           <option value="" disabled>Choose one</option>
           {q.options?.map((o) => (
             <option key={o.value} value={o.value}>
@@ -62,7 +66,8 @@ export function Field({ q }: { q: FormQuestion }) {
         <div className="checkgrid wide">
           {q.options?.map((o) => (
             <label className="checkline" key={o.value}>
-              <input type="checkbox" name={q.key} value={o.value} />
+              <input type="checkbox" name={q.key} value={o.value}
+                defaultChecked={asList(prior).includes(o.value)} />
               <span>
                 <strong>{o.label}</strong>
                 {o.description && <em className="optdesc">{o.description}</em>}
@@ -86,7 +91,7 @@ export function Field({ q }: { q: FormQuestion }) {
           {Array.from({ length: n }, (_, i) => (
             <div key={i}>
               <label htmlFor={`${id}_${i}`}>{ordinals[i] ?? `Choice ${i + 1}`}</label>
-              <select id={`${id}_${i}`} name={`${q.key}__${i}`} defaultValue=""
+              <select id={`${id}_${i}`} name={`${q.key}__${i}`} defaultValue={asList(prior)[i] ?? ""}
                 required={q.required && i === 0}>
                 <option value="">{i === 0 ? "Choose one" : "Optional"}</option>
                 {q.options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -101,10 +106,18 @@ export function Field({ q }: { q: FormQuestion }) {
   const inputType = q.type === "email" ? "email" : q.type === "phone" ? "tel" : q.type === "url" ? "url" : "text";
   return (
     <div className="formrow">{labelEl}
-      <input type={inputType} id={id} name={q.key} required={q.required}
+      <input type={inputType} id={id} name={q.key} required={q.required} defaultValue={asText(prior)}
         placeholder={q.type === "url" ? "https://" : undefined} />
     </div>
   );
+}
+
+function asText(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
+
+function asList(v: unknown): string[] {
+  return Array.isArray(v) ? v.map(String) : [];
 }
 
 function Para({ text }: { text: string }) {

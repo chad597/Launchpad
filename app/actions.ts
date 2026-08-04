@@ -20,6 +20,7 @@ import { getFormForEditing } from "@/lib/forms";
 import {
   slugifyKey, type FormQuestion, type QuestionOption, type QuestionType,
 } from "@/lib/mentor-form";
+import type { FormState } from "@/lib/form-state";
 
 // ---- auth ----
 
@@ -67,34 +68,75 @@ export async function postMessage(formData: FormData) {
   revalidatePath(`/messages/${pairingId}`);
 }
 
-export async function completeMentorHalf(formData: FormData) {
+// Everything the person typed, so a rejected note can be handed straight back.
+function echo(formData: FormData, keys: string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of keys) out[k] = String(formData.get(k) ?? "");
+  return out;
+}
+
+const MENTOR_HALF_FIELDS = [
+  "read", "seeing", "risks", "focus", "take", "keyInsight", "decisionMade",
+  "action_0", "action_owner_0", "action_due_0",
+  "action_1", "action_owner_1", "action_due_1",
+  "action_2", "action_owner_2", "action_due_2",
+];
+
+export async function completeMentorHalf(
+  state: FormState, formData: FormData
+): Promise<FormState> {
+  const next = state.attempt + 1;
+  const values = echo(formData, MENTOR_HALF_FIELDS);
+  const fail = (error: string) => ({ attempt: next, error, values });
+
   const user = await currentUser();
   const meetingId = String(formData.get("meetingId"));
   const meeting = await data.getMeeting(meetingId);
-  if (!meeting) return;
+  if (!meeting) return fail("That meeting no longer exists");
   const pairing = await data.getPairing(meeting.pairingId);
-  if (!pairing || pairing.mentorId !== user.id) return;
+  if (!pairing || pairing.mentorId !== user.id) {
+    return fail("Only the mentor on this pairing can finish the note");
+  }
+
+  // Submitting closes the record for good, so the two fields that carry the
+  // mentor's read have to actually be there. The browser enforces this too,
+  // but the browser is not the only thing that can post here.
+  const read = String(formData.get("read") ?? "").trim();
+  const take = String(formData.get("take") ?? "").trim();
+  const missingHalf: string[] = [];
+  if (!read) missingHalf.push("your read");
+  if (!take) missingHalf.push("my take");
+  if (missingHalf.length) return fail(`Still needed: ${missingHalf.join(" and ")}`);
 
   const actions: { description: string; ownerId: string; dueDate: string }[] = [];
   for (let i = 0; i < 3; i++) {
-    actions.push({
-      description: String(formData.get(`action_${i}`) ?? ""),
-      ownerId: String(formData.get(`action_owner_${i}`) ?? ""),
-      dueDate: String(formData.get(`action_due_${i}`) ?? ""),
-    });
+    const description = String(formData.get(`action_${i}`) ?? "").trim();
+    if (!description) continue;
+    // The owner comes from a dropdown, so only the two people in this pairing
+    // are ever valid. Anything else would hang an action item on a stranger.
+    const owner = String(formData.get(`action_owner_${i}`) ?? "");
+    const ownerId = owner === pairing.mentorId ? pairing.mentorId : pairing.founderId;
+    const due = String(formData.get(`action_due_${i}`) ?? "").trim();
+    // A date input sends YYYY-MM-DD. Anything else would fail the insert after
+    // the note had already been marked complete.
+    if (due && !/^\d{4}-\d{2}-\d{2}$/.test(due)) {
+      return fail(`Action ${i + 1} needs a real due date, or none at all`);
+    }
+    actions.push({ description, ownerId, dueDate: due });
   }
+
   await data.submitMentorHalf(
     meetingId,
     {
-      read: String(formData.get("read") ?? ""),
+      read,
       whatImSeeing: String(formData.get("seeing") ?? "").split("\n").filter(Boolean),
       risks: String(formData.get("risks") ?? "").split("\n").filter(Boolean),
       focusAdjustments: String(formData.get("focus") ?? "").split("\n").filter(Boolean),
-      myTake: String(formData.get("take") ?? ""),
+      myTake: take,
     },
     {
-      keyInsight: String(formData.get("keyInsight") ?? ""),
-      decisionMade: String(formData.get("decisionMade") ?? ""),
+      keyInsight: String(formData.get("keyInsight") ?? "").trim(),
+      decisionMade: String(formData.get("decisionMade") ?? "").trim(),
       actions,
     }
   );
@@ -102,13 +144,26 @@ export async function completeMentorHalf(formData: FormData) {
   redirect(`/note/${meetingId}`);
 }
 
-export async function submitFounderHalf(formData: FormData) {
+const FOUNDER_HALF_FIELDS = [
+  "statusFlag", "confidence", "whatMoved", "changedThinking", "needHelp", "focusNextWeek",
+];
+
+export async function submitFounderHalf(
+  state: FormState, formData: FormData
+): Promise<FormState> {
+  const next = state.attempt + 1;
+  const doneIds = formData.getAll("done").map(String);
+  const values = { ...echo(formData, FOUNDER_HALF_FIELDS), done: doneIds };
+  const fail = (error: string) => ({ attempt: next, error, values });
+
   const user = await currentUser();
   const meetingId = String(formData.get("meetingId"));
   const meeting = await data.getMeeting(meetingId);
-  if (!meeting) return;
+  if (!meeting) return fail("That meeting no longer exists");
   const pairing = await data.getPairing(meeting.pairingId);
-  if (!pairing || pairing.founderId !== user.id) return;
+  if (!pairing || pairing.founderId !== user.id) {
+    return fail("Only the founder on this pairing can write this half");
+  }
 
   const lines = (k: string) =>
     String(formData.get(k) ?? "").split("\n").map((s) => s.trim()).filter(Boolean);
@@ -116,20 +171,21 @@ export async function submitFounderHalf(formData: FormData) {
   const statusFlag = (["on_track", "at_risk", "off_track"].includes(raw) ? raw : "on_track") as
     "on_track" | "at_risk" | "off_track";
 
-  // Number("eight") is NaN, and Math.min/max propagate it rather than clamping.
-  const parsed = Number(formData.get("confidence"));
-  const confidence = Number.isFinite(parsed) ? Math.min(10, Math.max(1, Math.round(parsed))) : 5;
-
   const whatMoved = lines("whatMoved");
   const needHelp = String(formData.get("needHelp") ?? "").trim();
   const missing: string[] = [];
   if (!whatMoved.length) missing.push("what moved");
   if (!needHelp) missing.push("where you need help");
-  if (missing.length) {
-    redirect(`/note/${meetingId}?error=${encodeURIComponent(`Still needed: ${missing.join(" and ")}`)}`);
-  }
+  if (missing.length) return fail(`Still needed: ${missing.join(" and ")}`);
 
-  const doneIds = formData.getAll("done").map(String);
+  // Number("eight") is NaN, and Math.min/max propagate it rather than clamping.
+  // Confidence feeds the health score, so ask rather than guess a number.
+  const parsed = Number(String(formData.get("confidence") ?? "").trim());
+  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 10) {
+    return fail("Confidence needs to be a number from 1 to 10");
+  }
+  const confidence = Math.round(parsed);
+
   await data.submitFounderHalf(
     meetingId,
     {
@@ -203,7 +259,14 @@ export async function saveAvailability(formData: FormData) {
   const user = await currentUser();
   if (user.role !== "mentor") return;
   const availability = String(formData.get("availability") ?? "").trim();
-  const capacity = Math.min(10, Math.max(0, Number(formData.get("capacity") ?? 1)));
+  // Number("two") is NaN and Number("") is 0, so neither a typo nor an empty
+  // box may reach the database. Both keep the capacity they already had, since
+  // 0 means "take no new founders" and nobody should land there by accident.
+  const typed = String(formData.get("capacity") ?? "").trim();
+  const parsed = Number(typed);
+  const capacity = typed && Number.isFinite(parsed)
+    ? Math.min(10, Math.max(0, Math.round(parsed)))
+    : (user.capacity ?? 1);
   await data.setAvailability(user.id, availability, capacity);
   revalidatePath("/", "layout");
   redirect("/mentor");
@@ -258,15 +321,27 @@ function readAnswers(questions: FormQuestion[], formData: FormData) {
   return { answers, missing };
 }
 
-export async function submitMentorApplication(formData: FormData) {
+// Both intake forms hand their answers back on failure so the page can put
+// them straight back into the inputs. Success still redirects.
+function stillNeeded(missing: string[]) {
+  const shown = missing.slice(0, 3).join(", ");
+  return missing.length > 3
+    ? `Still needed: ${shown}, and ${missing.length - 3} more`
+    : `Still needed: ${shown}`;
+}
+
+export async function submitMentorApplication(
+  state: FormState, formData: FormData
+): Promise<FormState> {
+  const next = state.attempt + 1;
   // Spam trap. Silently accept so a bot cannot tell it failed.
   if (String(formData.get("website") ?? "")) redirect("/apply/thanks");
 
   const form = await getForm("mentor-application");
-  if (!form) redirect("/apply?error=This form is not available right now");
+  if (!form) return { attempt: next, error: "This form is not available right now" };
   const { answers, missing } = readAnswers(form.questions, formData);
   if (missing.length) {
-    redirect(`/apply?error=${encodeURIComponent(`Still needed: ${missing.slice(0, 3).join(", ")}`)}`);
+    return { attempt: next, error: stillNeeded(missing), values: answers };
   }
   const a = answers as Record<string, string>;
   const name = [a.first_name, a.last_name].filter(Boolean).join(" ").trim() || "Applicant";
@@ -280,14 +355,17 @@ export async function submitMentorApplication(formData: FormData) {
   redirect("/apply/thanks");
 }
 
-export async function submitMentorProfile(formData: FormData) {
+export async function submitMentorProfile(
+  state: FormState, formData: FormData
+): Promise<FormState> {
+  const next = state.attempt + 1;
   const user = await currentUser();
   if (user.role !== "mentor") redirect("/");
   const form = await getForm("mentor-profile");
-  if (!form) redirect("/");
+  if (!form) return { attempt: next, error: "This form is not available right now" };
   const { answers, missing } = readAnswers(form.questions, formData);
   if (missing.length) {
-    redirect(`/profile/setup?error=${encodeURIComponent(`Still needed: ${missing.slice(0, 3).join(", ")}`)}`);
+    return { attempt: next, error: stillNeeded(missing), values: answers };
   }
   await saveMentorProfile(user.id, answers);
   revalidatePath("/", "layout");
