@@ -16,6 +16,7 @@ interface Store {
   users: User[];
   cohorts: Cohort[];
   pool: { cohortId: string; mentorId: string }[];
+  members: { cohortId: string; userId: string }[];
   pairings: Pairing[];
   meetings: Meeting[];
   notes: MeetingNote[];
@@ -36,6 +37,9 @@ function store(): Store {
       pool: structuredClone(users)
         .filter((u) => u.role === "mentor")
         .map((u) => ({ cohortId: cohorts[0].id, mentorId: u.id })),
+      members: structuredClone(users)
+        .filter((u) => u.role === "founder")
+        .map((u) => ({ cohortId: cohorts[0].id, userId: u.id })),
       audit: [],
       pairings: structuredClone(pairings),
       meetings: structuredClone(meetings),
@@ -249,6 +253,28 @@ export function updateUserRole(id: string, role: User["role"]) {
 export function setUserStatus(id: string, status: "active" | "inactive") {
   const u = store().users.find((x) => x.id === id);
   if (u) u.status = status;
+}
+
+export function cohortMembers(cohortId: string): string[] {
+  return store().members.filter((m) => m.cohortId === cohortId).map((m) => m.userId);
+}
+
+export function addCohortMembers(cohortId: string, userIds: string[]) {
+  const s = store();
+  for (const userId of userIds) {
+    if (!s.members.some((m) => m.cohortId === cohortId && m.userId === userId)) {
+      s.members.push({ cohortId, userId });
+    }
+  }
+}
+
+export function addToMentorPool(cohortId: string, mentorIds: string[]) {
+  const s = store();
+  for (const mentorId of mentorIds) {
+    if (!s.pool.some((p) => p.cohortId === cohortId && p.mentorId === mentorId)) {
+      s.pool.push({ cohortId, mentorId });
+    }
+  }
 }
 
 export function listCohorts(): Cohort[] {

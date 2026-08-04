@@ -330,6 +330,26 @@ export async function setUserStatus(id: string, status: "active" | "inactive") {
   await sb.from("users").update({ status }).eq("id", id);
 }
 
+export async function cohortMembers(cohortId: string): Promise<string[]> {
+  const sb = await supabaseServer();
+  const { data } = await sb.from("cohort_members").select("user_id").eq("cohort_id", cohortId);
+  return (data ?? []).map((r: any) => r.user_id);
+}
+
+export async function addCohortMembers(cohortId: string, userIds: string[]) {
+  if (!userIds.length) return;
+  const sb = await supabaseServer();
+  await sb.from("cohort_members")
+    .upsert(userIds.map((user_id) => ({ cohort_id: cohortId, user_id })), { onConflict: "cohort_id,user_id" });
+}
+
+export async function addToMentorPool(cohortId: string, mentorIds: string[]) {
+  if (!mentorIds.length) return;
+  const sb = await supabaseServer();
+  await sb.from("cohort_mentor_pool")
+    .upsert(mentorIds.map((mentor_id) => ({ cohort_id: cohortId, mentor_id })), { onConflict: "cohort_id,mentor_id" });
+}
+
 export async function listCohorts(): Promise<Cohort[]> {
   const sb = await supabaseServer();
   const { data } = await sb

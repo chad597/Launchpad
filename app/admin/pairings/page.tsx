@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { currentUser } from "@/lib/session";
-import { getCohort, listPairings, listUsers, mentorPool } from "@/lib/data";
+import { cohortMembers, getCohort, listPairings, listUsers, mentorPool } from "@/lib/data";
 import { addPairing, changePairing } from "../../actions";
 import { AdminNav } from "../nav";
 
@@ -24,11 +24,16 @@ export default async function PairingsPage({
   }
   const { error } = await searchParams;
   const cohort = await getCohort();
-  const [pairings, users, pool] = await Promise.all([
-    listPairings(cohort.id), listUsers(), mentorPool(cohort.id),
+  const [pairings, users, pool, members] = await Promise.all([
+    listPairings(cohort.id), listUsers(), mentorPool(cohort.id), cohortMembers(cohort.id),
   ]);
   const byId = new Map(users.map((u) => [u.id, u]));
-  const founders = users.filter((u) => u.role === "founder" && u.status !== "inactive");
+  // Scope to this cohort's founders once membership is recorded; before that,
+  // fall back to every founder so the page still works.
+  const allFounders = users.filter((u) => u.role === "founder" && u.status !== "inactive");
+  const founders = members.length
+    ? allFounders.filter((f) => members.includes(f.id))
+    : allFounders;
   const poolMentors = users.filter((u) => pool.includes(u.id) && u.status !== "inactive");
   const activePairs = pairings.filter((p) => p.status === "active");
   const unmatched = founders.filter((f) => !activePairs.some((p) => p.founderId === f.id));

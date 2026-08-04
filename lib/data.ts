@@ -100,6 +100,15 @@ export async function updateUserRole(id: string, role: User["role"]) {
 export async function setUserStatus(id: string, status: "active" | "inactive") {
   return isDemo() ? demo.setUserStatus(id, status) : db.setUserStatus(id, status);
 }
+export async function cohortMembers(cohortId: string): Promise<string[]> {
+  return isDemo() ? demo.cohortMembers(cohortId) : db.cohortMembers(cohortId);
+}
+export async function addCohortMembers(cohortId: string, userIds: string[]) {
+  return isDemo() ? demo.addCohortMembers(cohortId, userIds) : db.addCohortMembers(cohortId, userIds);
+}
+export async function addToMentorPool(cohortId: string, mentorIds: string[]) {
+  return isDemo() ? demo.addToMentorPool(cohortId, mentorIds) : db.addToMentorPool(cohortId, mentorIds);
+}
 export async function listCohorts(): Promise<Cohort[]> {
   return isDemo() ? demo.listCohorts() : db.listCohorts();
 }

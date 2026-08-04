@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { currentUser } from "@/lib/session";
 import { listUsers } from "@/lib/data";
 import { addPerson, changeRole, changeStatus } from "../../actions";
@@ -95,6 +96,9 @@ export default async function PeoplePage({
 
       <div className="card" style={{ marginTop: "1.25rem" }}>
         <h2>Add someone</h2>
+        <p className="meta" style={{ margin: "0 0 .7rem" }}>
+          Bringing over a whole cohort? <Link href="/admin/import">Import from a CSV</Link> instead.
+        </p>
         <form action={addPerson}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".8rem" }}>
             <div className="formrow"><label htmlFor="name">Name</label>

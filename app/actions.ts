@@ -7,6 +7,7 @@ import * as data from "@/lib/data";
 import { currentUser, homeForRole } from "@/lib/session";
 import { isDemo, supabaseServer } from "@/lib/supabase/server";
 import { getUser as demoGetUser } from "@/lib/store";
+import type { ImportRow } from "@/lib/csv";
 
 // ---- auth ----
 
@@ -296,6 +297,55 @@ export async function changePairing(formData: FormData) {
     metadata: { status: status || undefined, cadence: cadence || undefined },
   });
   revalidatePath("/", "layout");
+}
+
+export async function importPeople(formData: FormData) {
+  const admin = await requireAdmin();
+  const cohortId = String(formData.get("cohortId") ?? "");
+  const joinCohort = formData.get("joinCohort") === "on";
+  const joinPool = formData.get("joinPool") === "on";
+
+  let rows: ImportRow[];
+  try {
+    rows = JSON.parse(String(formData.get("rows") ?? "[]"));
+  } catch {
+    redirect("/admin/import?error=Could not read that list, try previewing again");
+  }
+
+  const existing = new Set((await data.listUsers()).map((u) => u.email.toLowerCase()));
+  const createdFounders: string[] = [];
+  const createdMentors: string[] = [];
+  let skipped = 0;
+
+  for (const r of rows) {
+    const email = (r.email ?? "").trim().toLowerCase();
+    if (!email || !r.name || existing.has(email)) { skipped++; continue; }
+    const id = await data.createUser({
+      email, name: r.name, role: r.role,
+      company: r.company, stage: r.stage, bio: r.bio, expertise: r.expertise,
+    });
+    existing.add(email);
+    if (r.role === "founder") createdFounders.push(id);
+    if (r.role === "mentor") createdMentors.push(id);
+  }
+
+  if (cohortId && joinCohort && createdFounders.length) {
+    await data.addCohortMembers(cohortId, createdFounders);
+  }
+  if (cohortId && joinPool && createdMentors.length) {
+    await data.addToMentorPool(cohortId, createdMentors);
+  }
+
+  const created = createdFounders.length + createdMentors.length +
+    rows.filter((r) => r.role !== "founder" && r.role !== "mentor").length;
+  await data.writeAudit({
+    actorId: admin.id, action: "people.imported", subjectType: "cohort",
+    subjectId: cohortId || null,
+    metadata: { created, skipped, founders: createdFounders.length, mentors: createdMentors.length },
+  });
+
+  revalidatePath("/", "layout");
+  redirect(`/admin/people?added=${encodeURIComponent(`${created} people imported, ${skipped} skipped`)}`);
 }
 
 export async function markActionItem(formData: FormData) {
