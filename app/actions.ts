@@ -9,9 +9,13 @@ import { isDemo, supabaseServer } from "@/lib/supabase/server";
 import { getUser as demoGetUser } from "@/lib/store";
 import type { ImportRow } from "@/lib/csv";
 import {
-  acceptApplicant, addQuestion, deleteQuestion, getForm, moveQuestion,
-  saveMentorProfile, setApplicationStatus, submitApplication, updateFormCopy, updateQuestion,
+  acceptApplicant, addQuestion, deleteQuestion, getApplication, getForm, listApplications,
+  moveQuestion, saveMentorProfile, setApplicationStatus, submitApplication, updateFormCopy,
+  updateQuestion,
 } from "@/lib/forms";
+import {
+  emailAccepted, emailAdminNewApplication, emailApplicationReceived, emailDeclined, emailMatchIntro,
+} from "@/lib/email";
 import { slugifyKey, type FormQuestion, type QuestionType } from "@/lib/mentor-form";
 
 // ---- auth ----
@@ -206,7 +210,16 @@ export async function submitMentorApplication(formData: FormData) {
   }
   const a = answers as Record<string, string>;
   const name = [a.first_name, a.last_name].filter(Boolean).join(" ").trim() || "Applicant";
-  await submitApplication("mentor-application", answers, name, (a.email ?? "").toLowerCase(), a.phone ?? "");
+  const email = (a.email ?? "").toLowerCase();
+  await submitApplication("mentor-application", answers, name, email, a.phone ?? "");
+
+  // Best effort: a failed email must not lose the application.
+  await emailApplicationReceived(email, a.first_name || name);
+  const adminTo = process.env.ADMIN_EMAIL;
+  if (adminTo) {
+    const latest = (await listApplications()).find((x) => x.email === email);
+    await emailAdminNewApplication(adminTo, name, latest?.id ?? "");
+  }
   redirect("/apply/thanks");
 }
 
@@ -534,14 +547,19 @@ export async function reviewApplicant(formData: FormData) {
   const status = String(formData.get("status")) as "new" | "reviewing" | "accepted" | "declined";
   const note = String(formData.get("note") ?? "");
 
+  const app = await getApplication(id);
+  const firstName = String((app?.answers as Record<string, string>)?.first_name ?? app?.name ?? "there");
+
   if (status === "accepted") {
     const userId = await acceptApplicant(id, admin.id);
+    if (app?.email) await emailAccepted(app.email, firstName, userId);
     await data.writeAudit({
       actorId: admin.id, action: "applicant.accepted", subjectType: "application", subjectId: id,
-      metadata: { userId },
+      metadata: { userId, emailed: app?.email ?? null },
     });
   } else {
     await setApplicationStatus(id, status, admin.id, note);
+    if (status === "declined" && app?.email) await emailDeclined(app.email, firstName);
     await data.writeAudit({
       actorId: admin.id, action: `applicant.${status}`, subjectType: "application", subjectId: id,
       metadata: {},
@@ -579,6 +597,29 @@ export async function selectMatch(formData: FormData) {
   if (user.role !== "admin") return;
   const id = String(formData.get("suggestionId"));
   await data.confirmMatch(id);
+
+  // Intro both sides: rationale, contact details, and who reaches out first.
+  const founderId = String(formData.get("founderId") ?? "");
+  const target = founderId
+    ? (await data.cohortHealthBoard()).find((b) => b.founder.id === founderId)
+    : undefined;
+  if (target) {
+    const { founder, mentor, pairing: p } = target;
+    const deadline = new Date(Date.now() + 5 * 86400000).toLocaleDateString("en-US", {
+      weekday: "long", month: "long", day: "numeric",
+    });
+    await emailMatchIntro({
+      to: founder.email, userId: founder.id, recipientFirst: founder.name.split(" ")[0],
+      otherName: mentor.name, otherRole: "mentor", rationale: p.matchRationale,
+      contact: mentor.email, firstContactOwner: "You", deadline,
+    });
+    await emailMatchIntro({
+      to: mentor.email, userId: mentor.id, recipientFirst: mentor.name.split(" ")[0],
+      otherName: founder.name, otherRole: "founder", rationale: p.matchRationale,
+      contact: founder.email, firstContactOwner: founder.name.split(" ")[0], deadline,
+    });
+  }
+
   await data.writeAudit({
     actorId: user.id, action: "match.confirmed", subjectType: "match_suggestion",
     subjectId: id, metadata: {},

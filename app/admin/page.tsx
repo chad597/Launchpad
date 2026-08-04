@@ -91,7 +91,8 @@ export default async function AdminHome() {
                     {i === 0 && (
                       <form action={selectMatch} style={{ display: "inline" }}>
                         <input type="hidden" name="suggestionId" value={s.id} />
-                        <button className="btn">Confirm match</button>
+                        <input type="hidden" name="founderId" value={s.founderId} />
+                        <button className="btn">Confirm match and send the intro</button>
                       </form>
                     )}
                   </div>
