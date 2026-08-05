@@ -124,14 +124,12 @@ export default async function FounderHome({
               </>
             ) : (
               <>
-                <p className="meta" style={{ marginTop: 0 }}>
-                  Nothing on the calendar with {mentor.name.split(" ")[0]} yet. Booking one is the single most useful next step.
-                </p>
                 <BookMeeting
                   pairingId={pairing.id}
                   hasNext={false}
                   otherFirst={mentor.name.split(" ")[0]}
                   availability={mentor.availability}
+                  now={now}
                 />
                 <div className="notice">Booking it sets your note deadline 24 hours before the meeting, so you both walk in prepared.</div>
               </>
@@ -144,6 +142,7 @@ export default async function FounderHome({
                   hasNext
                   otherFirst={mentor.name.split(" ")[0]}
                   availability={mentor.availability}
+                  now={now}
                 />
               </>
             )}

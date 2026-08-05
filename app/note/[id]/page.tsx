@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import { currentUser } from "@/lib/session";
 import {
-  actionItemsForPairing, getMeeting, getPairing, getUser, meetingsForPairing, noteForMeeting,
+  actionItemsForPairing, currentTime, getMeeting, getPairing, getUser, meetingsForPairing,
+  noteForMeeting,
 } from "@/lib/data";
+import { bookingOptions } from "@/lib/availability";
 import { completeMentorHalf, submitFounderHalf } from "../../actions";
 import { FounderHalfForm, MentorHalfForm, type PriorItem } from "../note-forms";
 
@@ -26,11 +28,12 @@ export default async function NotePage({
   if (!meeting) notFound();
   const pairing = await getPairing(meeting.pairingId);
   if (!pairing) notFound();
-  const [founder, mentor, note, allItems] = await Promise.all([
+  const [founder, mentor, note, allItems, now] = await Promise.all([
     getUser(pairing.founderId),
     getUser(pairing.mentorId),
     noteForMeeting(meeting.id),
     actionItemsForPairing(pairing.id),
+    currentTime(),
   ]);
   if (!founder || !mentor) notFound();
 
@@ -130,6 +133,7 @@ export default async function NotePage({
           founderId={founder.id}
           mentorId={mentor.id}
           action={completeMentorHalf}
+          booking={bookingOptions(mentor.availability, now)}
         />
       ) : (
         <div className="card" style={{ marginTop: "1rem", borderColor: ms ? "var(--line)" : "var(--teal)" }}>

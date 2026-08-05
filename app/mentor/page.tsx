@@ -7,6 +7,7 @@ import {
   nextMeetingForPairing, noteForMeeting, pairingsForUser,
 } from "@/lib/data";
 import { meetingRhythmDays } from "@/lib/health";
+import { bookingOptions } from "@/lib/availability";
 import { completeMentorHalf, postMessage } from "../actions";
 import { Thread, type ThreadMessage } from "../thread";
 import { BookMeeting } from "../book-meeting";
@@ -47,6 +48,7 @@ export default async function MentorHome({
   if (await needsProfile(user.id)) redirect("/profile/setup");
   const pairs = await pairingsForUser(user.id);
   const now = await currentTime();
+  const booking = bookingOptions(user.availability, now);
 
   const views: PairView[] = await Promise.all(
     pairs.map(async (p) => {
@@ -158,6 +160,7 @@ export default async function MentorHome({
                       mentorId={user.id}
                       action={completeMentorHalf}
                       returnTo="/mentor"
+                      booking={booking}
                       embedded
                     />
                   </details>
@@ -174,6 +177,8 @@ export default async function MentorHome({
                   hasNext={!!v.next}
                   otherFirst={v.founder.name.split(" ")[0]}
                   availability={user.availability}
+                  now={now}
+                  availabilityIsMine
                 />
 
                 <hr className="divider" />

@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { EMPTY_FORM_STATE, type FormState } from "@/lib/form-state";
+import type { BookingOptions } from "@/lib/availability";
+import { DayTimePicker } from "../day-time-picker";
 
 // Both halves of the meeting note are client forms for one reason: when the
 // server rejects a submission it hands back what it read, and the form
@@ -107,7 +109,7 @@ export function FounderHalfForm({
 }
 
 export function MentorHalfForm({
-  meetingId, mentorFirst, founderFirst, founderId, mentorId, action, returnTo, embedded = false,
+  meetingId, mentorFirst, founderFirst, founderId, mentorId, action, returnTo, embedded = false, booking,
 }: {
   meetingId: string;
   mentorFirst: string;
@@ -117,6 +119,8 @@ export function MentorHalfForm({
   action: Action;
   returnTo?: string;
   embedded?: boolean;
+  /** Day and time options from the mentor's stated availability, when known. */
+  booking?: BookingOptions | null;
 }) {
   const [state, formAction, pending] = useActionState(action, EMPTY_FORM_STATE);
   const v = state.values;
@@ -167,12 +171,17 @@ export function MentorHalfForm({
               </div>
             ))}
           </div>
-          <div className="formrow"><label htmlFor="nextMeetingAt">Book your next meeting (optional)</label>
-            <input type="datetime-local" id="nextMeetingAt" name="nextMeetingAt"
-              defaultValue={text(v, "nextMeetingAt")} />
+          <div className="formrow">
+            <span className="label">Schedule the next meeting</span>
             <p className="help">
               The easiest moment to agree the next one is while you are still together. Leave it empty and either of you can book it later from your home screen.
             </p>
+            {booking ? (
+              <NextMeetingSlots options={booking} founderFirst={founderFirst} />
+            ) : (
+              <input type="datetime-local" id="nextMeetingAt" name="nextMeetingAt"
+                defaultValue={text(v, "nextMeetingAt")} />
+            )}
           </div>
           <button className="btn" type="submit" disabled={pending}>
             {pending ? "Submitting..." : "Submit the finished note"}
@@ -180,6 +189,49 @@ export function MentorHalfForm({
           <div className="notice">Submitting marks the meeting complete and sends the full note to {founderFirst}. Open action items appear on their home screen and start the next note.</div>
         </div>
       </form>
+    </>
+  );
+}
+
+// The picker inside the note posts alongside the note itself, so it has no
+// submit button of its own and no time is a valid answer.
+function NextMeetingSlots({
+  options, founderFirst,
+}: {
+  options: BookingOptions;
+  founderFirst: string;
+}) {
+  const [day, setDay] = useState<number | null>(null);
+  const [time, setTime] = useState<number | null>(null);
+  const chosen = day !== null && time !== null
+    ? `${options.days[day].value}T${options.times[time].value}` : "";
+
+  return (
+    <>
+      <input type="hidden" name="nextMeetingAt" value={chosen} />
+      <div className="lp-daygrid" style={{ marginBottom: "14px" }}>
+        {options.days.map((d, i) => (
+          <button key={d.value} type="button" className="lp-daycard" aria-pressed={day === i}
+            onClick={() => setDay(i)}>
+            <div className="lp-daycard-wd">{d.weekday}</div>
+            <div className="lp-daycard-dd">{d.date}</div>
+            <div className="lp-daycard-mo">{d.month}</div>
+          </button>
+        ))}
+      </div>
+      <div className="lp-slots">
+        {options.times.map((t, i) => (
+          <button key={t.value} type="button" className="lp-slot" aria-pressed={time === i}
+            onClick={() => setTime(i)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <p className="meta" style={{ margin: "10px 0 0" }}>
+        {chosen
+          ? `${options.days[day!].weekday}, ${options.days[day!].month} ${options.days[day!].date} at ${options.times[time!].label} with ${founderFirst}`
+          : "Nothing picked, which is fine."}
+      </p>
     </>
   );
 }
