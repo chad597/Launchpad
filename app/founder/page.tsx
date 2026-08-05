@@ -4,7 +4,8 @@ import {
   actionItemsForPairing, currentTime, getUser, messagesForPairing,
   meetingsForPairing, nextMeetingForPairing, noteForMeeting, pairingsForUser,
 } from "@/lib/data";
-import { bookMeeting, markActionItem, postMessage, submitFounderHalf } from "../actions";
+import { markActionItem, postMessage, submitFounderHalf } from "../actions";
+import { BookMeeting } from "../book-meeting";
 import { Thread, type ThreadMessage } from "../thread";
 import { FounderHalfForm, type PriorItem } from "../note/note-forms";
 
@@ -17,9 +18,9 @@ function fmt(dt: string) {
 export default async function FounderHome({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; booked?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, booked } = await searchParams;
   const user = await currentUser();
   const pairing = (await pairingsForUser(user.id))[0];
   if (!pairing) {
@@ -73,6 +74,7 @@ export default async function FounderHome({
           : <>No meeting on the books yet. Booking one is the single most useful next step.</>}
       </p>
       {error && <div className="banner bad">{error}</div>}
+      {booked && <div className="banner ok">Meeting booked. It is on both of your home screens now.</div>}
       <div className="grid two">
         <div>
           <div className="card">
@@ -121,19 +123,26 @@ export default async function FounderHome({
             ) : (
               <>
                 <p className="meta" style={{ marginTop: 0 }}>
-                  {mentor.availability
-                    ? <>{mentor.name.split(" ")[0]} is usually free: {mentor.availability}.</>
-                    : <>Pick a time that works for you both.</>}
+                  Nothing on the calendar with {mentor.name.split(" ")[0]} yet. Booking one is the single most useful next step.
                 </p>
-                <form action={bookMeeting}>
-                  <input type="hidden" name="pairingId" value={pairing.id} />
-                  <div className="formrow">
-                    <label htmlFor="scheduledAt">Date and time</label>
-                    <input type="datetime-local" id="scheduledAt" name="scheduledAt" required />
-                  </div>
-                  <button className="btn" type="submit">Book this meeting</button>
-                </form>
+                <BookMeeting
+                  pairingId={pairing.id}
+                  hasNext={false}
+                  otherFirst={mentor.name.split(" ")[0]}
+                  availability={mentor.availability}
+                />
                 <div className="notice">Booking it sets your note deadline 24 hours before the meeting, so you both walk in prepared.</div>
+              </>
+            )}
+            {next && (
+              <>
+                <hr className="divider" />
+                <BookMeeting
+                  pairingId={pairing.id}
+                  hasNext
+                  otherFirst={mentor.name.split(" ")[0]}
+                  availability={mentor.availability}
+                />
               </>
             )}
             <hr className="divider" />

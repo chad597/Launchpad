@@ -9,6 +9,7 @@ import {
 import { meetingRhythmDays } from "@/lib/health";
 import { completeMentorHalf, postMessage } from "../actions";
 import { Thread, type ThreadMessage } from "../thread";
+import { BookMeeting } from "../book-meeting";
 import { MentorHalfForm } from "../note/note-forms";
 import type { Meeting, MeetingNote, Pairing, User } from "@/lib/types";
 
@@ -34,7 +35,12 @@ interface PairView {
   finishable: Meeting | null;
 }
 
-export default async function MentorHome() {
+export default async function MentorHome({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; booked?: string }>;
+}) {
+  const { error, booked } = await searchParams;
   const user = await currentUser();
   if (user.role !== "mentor") redirect(homeForRole(user.role));
   // A newly accepted mentor completes their profile before anything else.
@@ -84,6 +90,8 @@ export default async function MentorHome() {
     <div className="wrap">
       <h1 className="page">Your founders</h1>
       <p className="sub">{views.length} active pairing{views.length === 1 ? "" : "s"}</p>
+      {error && <div className="banner bad">{error}</div>}
+      {booked && <div className="banner ok">Meeting booked. It is on both of your home screens now.</div>}
       <div className="grid two">
         <div>
           {views.map((v) => {
@@ -159,6 +167,14 @@ export default async function MentorHome() {
                     <Link className="linklike" href={`/note/${v.last.id}`}>Read it</Link>
                   </p>
                 ) : null}
+
+                <hr className="divider" />
+                <BookMeeting
+                  pairingId={v.pairing.id}
+                  hasNext={!!v.next}
+                  otherFirst={v.founder.name.split(" ")[0]}
+                  availability={user.availability}
+                />
 
                 <hr className="divider" />
                 <h3 style={{ margin: "0 0 .5rem" }}>Conversation</h3>

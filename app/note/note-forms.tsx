@@ -167,6 +167,13 @@ export function MentorHalfForm({
               </div>
             ))}
           </div>
+          <div className="formrow"><label htmlFor="nextMeetingAt">Book your next meeting (optional)</label>
+            <input type="datetime-local" id="nextMeetingAt" name="nextMeetingAt"
+              defaultValue={text(v, "nextMeetingAt")} />
+            <p className="help">
+              The easiest moment to agree the next one is while you are still together. Leave it empty and either of you can book it later from your home screen.
+            </p>
+          </div>
           <button className="btn" type="submit" disabled={pending}>
             {pending ? "Submitting..." : "Submit the finished note"}
           </button>

@@ -148,6 +148,7 @@ const MENTOR_HALF_FIELDS = [
   "action_0", "action_owner_0", "action_due_0",
   "action_1", "action_owner_1", "action_due_1",
   "action_2", "action_owner_2", "action_due_2",
+  "nextMeetingAt",
 ];
 
 export async function completeMentorHalf(
@@ -191,6 +192,13 @@ export async function completeMentorHalf(
       return fail(`Action ${i + 1} needs a real due date, or none at all`);
     }
     actions.push({ description, ownerId, dueDate: due });
+  }
+
+  // Booked as part of closing the note, while they are still together.
+  const nextWhen = String(formData.get("nextMeetingAt") ?? "").trim();
+  if (nextWhen) {
+    const bookingError = await scheduleMeeting(meeting.pairingId, nextWhen);
+    if (bookingError) return fail(bookingError);
   }
 
   await data.submitMentorHalf(
@@ -280,28 +288,39 @@ export async function submitFounderHalf(
   redirect(safeReturn(formData, `/note/${meetingId}`));
 }
 
-export async function bookMeeting(formData: FormData) {
-  const user = await currentUser();
-  const pairingId = String(formData.get("pairingId"));
-  const when = String(formData.get("scheduledAt") ?? "");
-  const pairing = await data.getPairing(pairingId);
-  if (!pairing || (pairing.founderId !== user.id && pairing.mentorId !== user.id)) return;
-  const home = homeForRole(user.role);
-  if (!when) redirect(`${home}?error=Pick a date and time`);
+// Booking happens in two places: the card on either home screen, and the
+// close of the meeting note, where the pair is together and has just agreed
+// what happens next. Both land here.
+//
+// Returns an error to show, or null when the meeting is booked.
+async function scheduleMeeting(pairingId: string, when: string): Promise<string | null> {
+  if (!when) return "Pick a date and time";
 
   // The picker sends a bare "2026-08-20T09:00" with no zone. Parsing that with
   // new Date() uses the server's zone, so on Vercel (UTC) a 9am booking would
   // land at 5am for everyone. Anchor it to the program's timezone instead.
   const at = new Date(`${when}:00${easternOffset(when)}`);
-  if (!Number.isFinite(at.getTime())) redirect(`${home}?error=That date did not look right`);
-  if (at.getTime() < Date.now()) redirect(`${home}?error=Pick a time in the future`);
+  if (!Number.isFinite(at.getTime())) return "That date did not look right";
+  if (at.getTime() < Date.now()) return "Pick a time in the future";
 
   const cohort = await data.getCohort();
   const start = new Date(cohort.startDate + "T00:00:00.000Z").getTime();
   const weekNo = Math.max(1, Math.floor((at.getTime() - start) / (7 * 24 * 3600 * 1000)) + 1);
   await data.createMeeting(pairingId, at.toISOString(), weekNo);
+  return null;
+}
+
+export async function bookMeeting(formData: FormData) {
+  const user = await currentUser();
+  const pairingId = String(formData.get("pairingId"));
+  const pairing = await data.getPairing(pairingId);
+  if (!pairing || (pairing.founderId !== user.id && pairing.mentorId !== user.id)) return;
+  const home = homeForRole(user.role);
+
+  const error = await scheduleMeeting(pairingId, String(formData.get("scheduledAt") ?? ""));
+  if (error) redirect(`${home}?error=${encodeURIComponent(error)}`);
   revalidatePath("/", "layout");
-  redirect(homeForRole(user.role));
+  redirect(`${home}?booked=1`);
 }
 
 export async function submitFlag(formData: FormData) {
