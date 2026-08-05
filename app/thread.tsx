@@ -48,11 +48,11 @@ export function Thread({
             Nothing here yet. A short message between meetings is often worth more than waiting for the next one.
           </p>
         ) : messages.map((m) => (
-          <div className="msg" key={m.id}>
-            <span className={`avatar${m.mine ? " o" : ""}`}>{m.senderInitials}</span>
+          <div className={`msg${m.mine ? " mine" : ""}`} key={m.id}>
+            {!m.mine && <span className="avatar">{m.senderInitials}</span>}
             <div>
               <div className="bubble">{m.body}</div>
-              <div className="t">{m.senderFirst} · {m.createdAt}</div>
+              <div className="t">{m.mine ? "You" : m.senderFirst} · {m.createdAt}</div>
             </div>
           </div>
         ))}

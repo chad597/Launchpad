@@ -61,46 +61,36 @@ export default async function MeetingsPage() {
       </p>
 
       {rows.length > 0 && (
-        <div className="tablewrap">
-          <table className="board">
-            <thead>
-              <tr><th>When</th><th>With</th><th>Week</th><th>Status</th><th>Note</th><th></th></tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const mine = user.role === "founder"
-                  ? r.note?.founderSubmittedAt : r.note?.mentorSubmittedAt;
-                const theirs = user.role === "founder"
-                  ? r.note?.mentorSubmittedAt : r.note?.founderSubmittedAt;
-                return (
-                  <tr key={r.meeting.id}>
-                    <td>{fmt(r.meeting.scheduledAt)}</td>
-                    <td>{r.other.name}</td>
-                    <td>{r.meeting.weekNumber}</td>
-                    <td>
-                      {r.note?.statusFlag && (
-                        <span className={`pill ${STATUS_PILL[r.note.statusFlag]}`}>
-                          {STATUS_LABEL[r.note.statusFlag]}
-                        </span>
-                      )}
-                      {r.note?.confidence != null && (
-                        <> <span className="pill info">Confidence {r.note.confidence}/10</span></>
-                      )}
-                    </td>
-                    <td>
-                      <span className={`pill ${mine ? "good" : "warn"}`}>
-                        {mine ? "Yours is in" : "Yours is open"}
-                      </span>{" "}
-                      <span className={`pill ${theirs ? "good" : "warn"}`}>
-                        {theirs ? "Theirs is in" : "Theirs is open"}
-                      </span>
-                    </td>
-                    <td><Link className="linklike" href={`/note/${r.meeting.id}`}>Open</Link></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          {rows.map((r, i) => {
+            const mine = user.role === "founder"
+              ? r.note?.founderSubmittedAt : r.note?.mentorSubmittedAt;
+            const theirs = user.role === "founder"
+              ? r.note?.mentorSubmittedAt : r.note?.founderSubmittedAt;
+            return (
+              <div className="lp-row" key={r.meeting.id}
+                style={i === rows.length - 1 ? { borderBottom: 0 } : undefined}>
+                <div className="lp-row-main">
+                  <div style={{ fontSize: "17px", fontWeight: 600 }}>{fmt(r.meeting.scheduledAt)}</div>
+                  <div className="meta">{r.other.name} · Week {r.meeting.weekNumber}</div>
+                </div>
+                <div className="lp-row-col" style={{ display: "flex", flexWrap: "wrap", gap: "7px" }}>
+                  {r.note?.statusFlag && (
+                    <span className={`pill ${STATUS_PILL[r.note.statusFlag]}`}>
+                      {STATUS_LABEL[r.note.statusFlag]}
+                    </span>
+                  )}
+                  <span className={`pill ${mine ? "good" : "warn"}`}>
+                    {mine ? "Yours is in" : "Yours is open"}
+                  </span>
+                  <span className={`pill ${theirs ? "good" : "warn"}`}>
+                    {theirs ? "Theirs is in" : "Theirs is open"}
+                  </span>
+                </div>
+                <Link className="linklike lp-row-col" href={`/note/${r.meeting.id}`}>Open note</Link>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

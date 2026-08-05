@@ -47,38 +47,46 @@ export default async function AdminHome() {
       </p>
 
       <div className="stat-row">
-        <div className="stat"><div className="n">{board.length}</div><div className="l">Active pairings</div><div className="d" style={{ color: "var(--good)" }}>All matched in week 3</div></div>
-        <div className="stat"><div className="n">{noteCompliance}%</div><div className="l">Note compliance</div><div className="d" style={{ color: noteCompliance >= 90 ? "var(--good)" : "var(--warn)" }}>{noteCompliance >= 90 ? "On pace" : "Chasing stragglers"}</div></div>
-        <div className="stat"><div className="n">{needsAttention.length}</div><div className="l">Pairs need attention</div><div className="d" style={{ color: needsAttention.length ? "var(--crit)" : "var(--good)" }}>{needsAttention.filter((b) => b.health === "attention").length} red · {needsAttention.filter((b) => b.health === "watch").length} yellow</div></div>
-        <div className="stat"><div className="n">{flags.length}</div><div className="l">Open flags</div><div className="d" style={{ color: flags.length ? "var(--warn)" : "var(--good)" }}>{flags.length ? "Review below" : "None open"}</div></div>
+        <div className="stat"><div className="n">{board.length}</div><div className="l">Active pairings</div><div className="d">All matched in week 3</div></div>
+        <div className="stat"><div className="n">{noteCompliance}%</div><div className="l">Note compliance</div><div className="d">{noteCompliance >= 90 ? "On pace" : "Chasing stragglers"}</div></div>
+        <div className="stat"><div className="n">{needsAttention.length}</div><div className="l">Pairs need attention</div><div className="d">{needsAttention.filter((b) => b.health === "attention").length} need attention · {needsAttention.filter((b) => b.health === "watch").length} to watch</div></div>
+        <div className="stat"><div className="n">{flags.length}</div><div className="l">Open flags</div><div className="d">{flags.length ? "Review below" : "None open"}</div></div>
       </div>
 
-      <div className="tablewrap">
-        <table className="board">
-          <thead>
-            <tr><th></th><th>Pair</th><th>Health</th><th>Last met</th><th>Next meeting</th><th>Notes</th><th>Signal</th></tr>
-          </thead>
-          <tbody>
-            {board.map((b) => (
-              <tr key={b.pairing.id}>
-                <td className={`stripe ${b.health}`}></td>
-                <td>
-                  <Link href={`/admin/pairings/${b.pairing.id}`}>
-                    {b.founder.name.split(" ").pop()} · {b.mentor.name.split(" ").pop()}
-                  </Link>
-                </td>
-                <td><span className={`pill ${HEALTH_PILL[b.health]}`}>{HEALTH_LABEL[b.health]}</span></td>
-                <td>{b.lastMetDaysAgo != null ? `${b.lastMetDaysAgo} days ago` : "Never"}</td>
-                <td>{b.nextMeeting ? fmtDay(b.nextMeeting.scheduledAt) : "None booked"}</td>
-                <td>{b.notesComplete} / {b.notesExpected}</td>
-                <td className="meta">{b.signal}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <section style={{ marginBottom: "var(--lp-stack)" }}>
+        <h2 className="lp-heading" style={{ marginBottom: "12px" }}>Pairings</h2>
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          {board.map((b, i) => (
+            <div className="lp-row" key={b.pairing.id}
+              style={i === board.length - 1 ? { borderBottom: 0 } : undefined}>
+              <div className="lp-row-main">
+                <Link href={`/admin/pairings/${b.pairing.id}`}
+                  style={{ fontSize: "16px", fontWeight: 600, textDecoration: "none" }}>
+                  {b.founder.name.split(" ").pop()} · {b.mentor.name.split(" ").pop()}
+                </Link>
+                <div className="meta">{b.signal}</div>
+              </div>
+              <div className="lp-row-col" style={{ flexBasis: "105px" }}>
+                <div className="lp-row-label">Last met</div>
+                <div className="lp-small">{b.lastMetDaysAgo != null ? `${b.lastMetDaysAgo} days ago` : "Never"}</div>
+              </div>
+              <div className="lp-row-col" style={{ flexBasis: "120px" }}>
+                <div className="lp-row-label">Next</div>
+                <div className="lp-small">{b.nextMeeting ? fmtDay(b.nextMeeting.scheduledAt) : "None booked"}</div>
+              </div>
+              <div className="lp-row-col" style={{ flexBasis: "60px" }}>
+                <div className="lp-row-label">Notes</div>
+                <div className="lp-small">{b.notesComplete} / {b.notesExpected}</div>
+              </div>
+              <div className="lp-row-col" style={{ flexBasis: "96px" }}>
+                <span className={`pill ${HEALTH_PILL[b.health]}`}>{HEALTH_LABEL[b.health]}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
-      <div className="grid two" style={{ marginTop: "1.25rem" }}>
+      <div className="grid two">
         <div className="card">
           <h2>{rematch ? `Matching · ${rematch.founder.name} (rematch)` : "Matching"}</h2>
           {user.role !== "admin" ? (

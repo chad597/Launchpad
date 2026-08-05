@@ -40,7 +40,9 @@ export default async function FounderHome({
   const minutesLeft = noteDue ? Math.round((noteDue.getTime() - now.getTime()) / 60000) : null;
   const openItems = items.filter((a) => a.status === "open");
   const notes = await Promise.all(meetings.map((m) => noteForMeeting(m.id)));
-  const confidences = notes.filter((n) => n?.confidence != null).map((n) => n!.confidence!);
+  const confidences = meetings
+    .map((m, i) => ({ week: m.weekNumber, value: notes[i]?.confidence ?? null }))
+    .filter((r): r is { week: number; value: number } => r.value != null);
   const people = new Map([[user.id, user], [mentor.id, mentor]]);
   // Items agreed at meetings before this one, which the note rolls forward.
   const earlier = new Set(
@@ -153,8 +155,9 @@ export default async function FounderHome({
                   <form action={markActionItem} style={{ display: "inline" }}>
                     <input type="hidden" name="id" value={a.id} />
                     <input type="hidden" name="pairingId" value={a.pairingId} />
-                    <button className="linklike" aria-label={a.status === "done" ? "Mark open" : "Mark done"}>
-                      {a.status === "done" ? "☑" : "☐"}
+                    <button className="linklike" style={{ textDecoration: "none" }}
+                      aria-label={a.status === "done" ? "Mark open" : "Mark done"}>
+                      <span className={`check${a.status === "done" ? " on" : ""}`} />
                     </button>
                   </form>{" "}
                   <span style={{ color: "var(--ink)" }}>{a.description}</span>{" "}
@@ -185,11 +188,11 @@ export default async function FounderHome({
           <div className="card">
             <h2>Your confidence, week by week</h2>
             {confidences.length > 0 ? (
-              <ConfidenceSpark values={confidences} />
+              <ConfidenceBars readings={confidences} />
             ) : (
               <p className="meta">Shows up once your first meeting note is in.</p>
             )}
-            <p className="meta" style={{ margin: ".3rem 0 0" }}>Six weeks from now, this is the clearest record of how your thinking moved.</p>
+            <p className="meta" style={{ margin: ".6rem 0 0" }}>Six weeks from now, this is the clearest record of how your thinking moved.</p>
           </div>
           <div className="card">
             <h2>Need something else?</h2>
@@ -226,25 +229,18 @@ function dueLabel(minutes: number | null): string {
   return `due in ${Math.round(minutes / 1440)} days`;
 }
 
-function ConfidenceSpark({ values }: { values: number[] }) {
-  const w = 300, h = 64, pad = 14;
-  // A single reading sits in the middle rather than pinned to the left edge.
-  const step = values.length > 1 ? (w - pad * 2) / (values.length - 1) : 0;
-  const x = (i: number) => (values.length === 1 ? w / 2 : pad + i * step);
-  const y = (v: number) => h - 12 - (v / 10) * (h - 26);
-  const pts = values.map((v, i) => `${x(i)},${y(v)}`).join(" ");
-  const last = values[values.length - 1];
+function ConfidenceBars({ readings }: { readings: { week: number; value: number }[] }) {
   return (
-    <svg className="spark" viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`Confidence trend: ${values.join(", ")} out of 10`}>
-      <line x1={8} y1={h - 12} x2={w - 8} y2={h - 12} stroke="var(--line)" strokeWidth="1" />
-      {values.length > 1 && (
-        <polyline points={pts} fill="none" stroke="var(--teal-text)" strokeWidth="2" strokeLinecap="round" />
-      )}
-      {values.map((v, i) => (
-        <circle key={i} cx={x(i)} cy={y(v)} r={i === values.length - 1 ? 5 : 4}
-          fill={i === values.length - 1 ? "var(--orange)" : "var(--teal-text)"} />
+    <>
+      {readings.map((r, i) => (
+        <div key={i} style={{ marginBottom: "14px" }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "12px", marginBottom: "6px" }}>
+            <span className="meta">Week {r.week}</span>
+            <span style={{ fontSize: "15px", fontWeight: 600 }}>{r.value} / 10</span>
+          </div>
+          <div className="meter"><span style={{ width: `${r.value * 10}%` }} /></div>
+        </div>
       ))}
-      <text x={w - 10} y={14} textAnchor="end" fontSize="11" fill="var(--ink-soft)" fontWeight="700">{last} / 10</text>
-    </svg>
+    </>
   );
 }
