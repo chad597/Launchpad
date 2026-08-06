@@ -58,9 +58,9 @@ export const INDUSTRY_PREF_OPTIONS: QuestionOption[] = [
 ];
 
 export const CANDOR_OPTIONS: QuestionOption[] = [
-  { value: "direct", label: "Say it straight" },
-  { value: "questions", label: "Ask me questions until I see it myself" },
-  { value: "gentle", label: "Land it gently, then be direct" },
+  { value: "direct", label: "Tell me straight" },
+  { value: "questions", label: "Ask me questions and let me get there myself" },
+  { value: "gentle", label: "Ease into it, then get specific" },
 ];
 
 const GROUND_RULES = `Three things we ask. Show up for the meetings you book. Fill in your half of the meeting note the day before, so your mentor walks in ready. Tell us early when something is not working, including when the match is wrong.
@@ -179,7 +179,7 @@ export const DEFAULT_FOUNDER_BRIEF_FORM: FormDefinition = {
         label: "What do you want to walk out of the first meeting with?" }),
 
     b({ key: "candor", section: "How to be useful to you", type: "dropdown", required: true,
-        label: "When your mentor thinks you are wrong, how do you want to hear it?",
+        label: "How do you like to be coached?",
         options: CANDOR_OPTIONS }),
     b({ key: "context", section: "How to be useful to you", type: "long_text", required: false,
         label: "Anything about you or your situation that helps them understand you?",
