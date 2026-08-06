@@ -89,7 +89,7 @@ export default async function CohortsPage({
       <div className="card" style={{ marginTop: "1.25rem" }}>
         <h2>Start a cohort</h2>
         <form action={addCohort}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: ".8rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: ".8rem" }}>
             <div className="formrow"><label htmlFor="name">Name</label>
               <input type="text" id="name" name="name" placeholder="Cohort 8" required /></div>
             <div className="formrow"><label htmlFor="ecosystem">Ecosystem</label>

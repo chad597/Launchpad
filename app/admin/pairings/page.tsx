@@ -99,7 +99,7 @@ export default async function PairingsPage({
         </p>
         <form action={addPairing}>
           <input type="hidden" name="cohortId" value={cohort.id} />
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".8rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: ".8rem" }}>
             <div className="formrow"><label htmlFor="founderId">Founder</label>
               <select id="founderId" name="founderId" required defaultValue="">
                 <option value="" disabled>Choose a founder</option>

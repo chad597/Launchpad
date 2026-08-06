@@ -49,7 +49,7 @@ export default async function AdminHome() {
       <div className="stat-row">
         <div className="stat"><div className="n">{board.length}</div><div className="l">Active pairings</div><div className="d">All matched in week 3</div></div>
         <div className="stat"><div className="n">{noteCompliance}%</div><div className="l">Note compliance</div><div className="d">{noteCompliance >= 90 ? "On pace" : "Chasing stragglers"}</div></div>
-        <div className="stat"><div className="n">{needsAttention.length}</div><div className="l">Pairs need attention</div><div className="d">{needsAttention.filter((b) => b.health === "attention").length} need attention · {needsAttention.filter((b) => b.health === "watch").length} to watch</div></div>
+        <div className="stat"><div className="n">{needsAttention.length}</div><div className="l">Pairs need attention</div><div className="d">{needsAttention.filter((b) => b.health === "attention").length} urgent · {needsAttention.filter((b) => b.health === "watch").length} to watch</div></div>
         <div className="stat"><div className="n">{flags.length}</div><div className="l">Open flags</div><div className="d">{flags.length ? "Review below" : "None open"}</div></div>
       </div>
 

@@ -123,7 +123,7 @@ export default async function PeoplePage({
           Bringing over a whole cohort? <Link href="/admin/import">Import from a CSV</Link> instead.
         </p>
         <form action={addPerson}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".8rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: ".8rem" }}>
             <div className="formrow"><label htmlFor="name">Name</label>
               <input type="text" id="name" name="name" required /></div>
             <div className="formrow"><label htmlFor="email">Email</label>

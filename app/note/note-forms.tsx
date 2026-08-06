@@ -73,7 +73,7 @@ export function FounderHalfForm({
               </ul>
             </div>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".8rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: ".8rem" }}>
             <div className="formrow"><label htmlFor="statusFlag">Status</label>
               <select id="statusFlag" name="statusFlag" defaultValue={text(v, "statusFlag") || "on_track"}>
                 <option value="on_track">On track</option>
@@ -158,7 +158,7 @@ export function MentorHalfForm({
               These three rows are where action items come from. What you write here lands on {founderFirst}&rsquo;s home screen, and it opens the next note as a checklist you both review together. Leave them blank and the pair has nothing to track between meetings.
             </p>
             {[0, 1, 2].map((i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: ".5rem", marginBottom: ".5rem" }}>
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: ".5rem", marginBottom: ".5rem" }}>
                 <input type="text" name={`action_${i}`} defaultValue={text(v, `action_${i}`)}
                   placeholder="What happens next" aria-label={`Action ${i + 1}`} />
                 <select name={`action_owner_${i}`} aria-label={`Owner for action ${i + 1}`}

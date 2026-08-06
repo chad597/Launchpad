@@ -88,7 +88,7 @@ export default async function FormEditor({
                       defaultValue={(q.options ?? []).map((o) => o.description ? `${o.label} | ${o.description}` : o.label).join("\n")} />
                   </div>
                 )}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".8rem" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: ".8rem" }}>
                   <div className="formrow"><label>Section</label>
                     <input type="text" name="section" defaultValue={q.section} /></div>
                   {(q.type === "ranked_select" || q.type === "multi_select") && (
@@ -148,7 +148,7 @@ export default async function FormEditor({
         <h2>Add a question</h2>
         <form action={createQuestion}>
           <input type="hidden" name="slug" value={slug} />
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: ".8rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: ".8rem" }}>
             <div className="formrow"><label htmlFor="nq_label">Question</label>
               <input type="text" id="nq_label" name="label" required placeholder="What can you help a founder do?" /></div>
             <div className="formrow"><label htmlFor="nq_type">Type</label>
@@ -165,7 +165,7 @@ export default async function FormEditor({
           </div>
           <div className="formrow"><label htmlFor="nq_body">Body copy</label>
             <textarea id="nq_body" name="body" placeholder="Only for statements and agreements." /></div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: ".8rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: ".8rem" }}>
             <div className="formrow"><label htmlFor="nq_section">Section</label>
               <input type="text" id="nq_section" name="section" placeholder="About you" /></div>
             <div className="formrow"><label htmlFor="nq_max">Maximum choices</label>
