@@ -10,8 +10,8 @@ import { getUser as demoGetUser } from "@/lib/store";
 import type { ImportRow } from "@/lib/csv";
 import {
   acceptApplicant, addQuestion, deleteQuestion, getApplication, getForm, listApplications,
-  moveQuestion, saveMentorProfile, setApplicationStatus, submitApplication, updateFormCopy,
-  updateQuestion,
+  moveQuestion, saveFounderBrief, saveFounderIntake, saveMentorProfile, setApplicationStatus,
+  submitApplication, updateFormCopy, updateQuestion,
 } from "@/lib/forms";
 import {
   emailAccepted, emailAdminNewApplication, emailApplicationReceived, emailDeclined, emailMatchIntro,
@@ -457,6 +457,47 @@ export async function submitMentorProfile(
   await saveMentorProfile(user.id, answers);
   revalidatePath("/", "layout");
   redirect("/mentor");
+}
+
+// The founder intake form, which every founder fills in before they can use
+// the app. It is the whole founder side of matching, so nothing here is
+// optional except the two questions marked optional on the form itself.
+export async function submitFounderIntake(
+  state: FormState, formData: FormData
+): Promise<FormState> {
+  const next = state.attempt + 1;
+  const user = await currentUser();
+  if (user.role !== "founder") redirect(homeForRole(user.role));
+  const form = await getForm("founder-intake");
+  if (!form) return { attempt: next, error: "This form is not available right now" };
+  const { answers, missing } = readAnswers(form.questions, formData);
+  if (missing.length) {
+    return { attempt: next, error: stillNeeded(missing), values: answers };
+  }
+  await saveFounderIntake(user.id, answers);
+  revalidatePath("/", "layout");
+  redirect("/founder?intake=1");
+}
+
+// The brief a founder writes to their mentor before the first meeting. It
+// only makes sense once they know who they are writing to.
+export async function submitFounderBrief(
+  state: FormState, formData: FormData
+): Promise<FormState> {
+  const next = state.attempt + 1;
+  const user = await currentUser();
+  if (user.role !== "founder") redirect(homeForRole(user.role));
+  const pairs = await data.pairingsForUser(user.id);
+  if (!pairs.length) redirect("/founder");
+  const form = await getForm("founder-brief");
+  if (!form) return { attempt: next, error: "This form is not available right now" };
+  const { answers, missing } = readAnswers(form.questions, formData);
+  if (missing.length) {
+    return { attempt: next, error: stillNeeded(missing), values: answers };
+  }
+  await saveFounderBrief(user.id, answers);
+  revalidatePath("/", "layout");
+  redirect("/founder?briefed=1");
 }
 
 // ---- admin ----

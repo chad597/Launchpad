@@ -237,6 +237,15 @@ input[type="checkbox"]{accent-color:var(--lp-accent); width:auto}
 .checkline .optdesc{display:block; font-style:normal; font-size:var(--lp-size-small); color:var(--lp-text-muted); margin-top:2px}
 .rankgrid{display:grid; gap:var(--lp-space-5)}
 @media(min-width:640px){ .rankgrid{grid-template-columns:repeat(3,1fr)} }
+
+/* — answers read back, rendered from the form definition — */
+.answers{margin:0}
+.answers > div{margin:0 0 var(--lp-space-6)}
+.answers dt{font-size:var(--lp-size-small); font-weight:var(--lp-weight-semibold); color:var(--lp-ink);
+  margin:0 0 var(--lp-space-2)}
+.answers dd{margin:0; background:var(--lp-surface-sunk); border-radius:var(--lp-radius-control);
+  padding:var(--lp-space-5) var(--lp-space-6); font-size:var(--lp-size-body);
+  white-space:pre-wrap; text-wrap:pretty}
 .statement{background:var(--lp-surface-sunk); border-radius:var(--lp-radius-control); padding:var(--lp-card-pad-tight); margin:var(--lp-space-7) 0}
 .statement h3{margin:0 0 var(--lp-space-5); font-size:var(--lp-size-subheading)}
 .statement .stmt-h{margin:var(--lp-space-6) 0 var(--lp-space-2); font-size:var(--lp-size-body); color:var(--lp-ink)}

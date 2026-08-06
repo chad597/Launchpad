@@ -6,6 +6,10 @@ import {
   DEFAULT_MENTOR_FORM, DEFAULT_PROFILE_FORM,
   type FormDefinition, type FormQuestion, type QuestionOption, type QuestionType,
 } from "./mentor-form";
+import {
+  DEFAULT_FOUNDER_BRIEF_FORM, DEFAULT_FOUNDER_INTAKE_FORM, founderStageLine,
+} from "./founder-form";
+import { DEMO_FOUNDER_PROFILES } from "./fixtures";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -21,17 +25,36 @@ export interface Application {
   invitedUserId?: string | null;
 }
 
+// What a founder told us, in the two places they told us: the intake form
+// they fill in at first sign-in, and the brief they write once they know who
+// their mentor is.
+export interface FounderProfile {
+  intake: Record<string, unknown> | null;
+  intakeAt: string | null;
+  brief: Record<string, unknown> | null;
+  briefAt: string | null;
+}
+
+export const EMPTY_FOUNDER_PROFILE: FounderProfile = {
+  intake: null, intakeAt: null, brief: null, briefAt: null,
+};
+
 interface FormStore {
   forms: FormDefinition[];
   applications: Application[];
+  founderProfiles: Record<string, FounderProfile>;
 }
 
 const g = globalThis as unknown as { __formStore?: FormStore };
 function mem(): FormStore {
   if (!g.__formStore) {
     g.__formStore = {
-      forms: [structuredClone(DEFAULT_MENTOR_FORM), structuredClone(DEFAULT_PROFILE_FORM)],
+      forms: [
+        structuredClone(DEFAULT_MENTOR_FORM), structuredClone(DEFAULT_PROFILE_FORM),
+        structuredClone(DEFAULT_FOUNDER_INTAKE_FORM), structuredClone(DEFAULT_FOUNDER_BRIEF_FORM),
+      ],
       applications: [],
+      founderProfiles: structuredClone(DEMO_FOUNDER_PROFILES),
     };
   }
   return g.__formStore;
@@ -332,6 +355,97 @@ export async function saveMentorProfile(userId: string, answers: Record<string, 
     profile_answers: answers,
     profile_completed_at: new Date().toISOString(),
   }).eq("id", userId);
+}
+
+// ---- founder intake and brief ----
+
+// Blank answers are stored as null rather than skipped, so clearing a field
+// clears the column too. A key that is missing entirely means the admin
+// archived that question, and the column it feeds is left alone.
+function textCol(v: unknown): string | null | undefined {
+  if (v === undefined) return undefined;
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
+function dropUndefined(row: Record<string, unknown>) {
+  for (const k of Object.keys(row)) if (row[k] === undefined) delete row[k];
+  return row;
+}
+
+// The founder intake form, filled in at first sign-in. The answers matching
+// reads are copied onto the user record; the whole set is kept as jsonb so
+// the mentor-facing view renders whatever questions the form asks today.
+export async function saveFounderIntake(userId: string, answers: Record<string, unknown>) {
+  const a = answers as Record<string, any>;
+  const now = new Date().toISOString();
+
+  if (isDemo()) {
+    const store = mem().founderProfiles;
+    const prior = store[userId] ?? EMPTY_FOUNDER_PROFILE;
+    store[userId] = { ...prior, intake: answers, intakeAt: now };
+    return;
+  }
+
+  const sb = await supabaseServer();
+  const row = dropUndefined({
+    phone: textCol(a.phone),
+    company: textCol(a.company),
+    website: textCol(a.website),
+    linkedin: textCol(a.linkedin),
+    time_zone: textCol(a.time_zone),
+    availability: textCol(a.availability),
+    bio: textCol(a.one_liner),
+    founder_stage: textCol(a.stage),
+    team_shape: textCol(a.team),
+    time_commitment: textCol(a.commitment),
+    challenge: textCol(a.biggest_challenge),
+    goal: textCol(a.win),
+    mentoring_format: textCol(a.mentoring_format),
+    industry_pref: textCol(a.industry_pref),
+    // Stored as a one-element array so it joins against a mentor's industries
+    // the same way on both sides.
+    industries: a.industry === undefined ? undefined : a.industry ? [a.industry] : [],
+    needs: Array.isArray(a.needs) ? a.needs : undefined,
+    strengths: Array.isArray(a.strengths) ? a.strengths : undefined,
+    // The one-line summary mentor and admin lists already render.
+    stage: a.stage === undefined && a.industry === undefined
+      ? undefined
+      : founderStageLine(a.stage, a.industry) || null,
+    profile_answers: answers,
+    profile_completed_at: now,
+  });
+  await sb.from("users").update(row).eq("id", userId);
+}
+
+// The brief, written to the mentor once a pairing exists. Nothing here feeds
+// matching, so it stays as jsonb and is rendered from the form definition.
+export async function saveFounderBrief(userId: string, answers: Record<string, unknown>) {
+  const now = new Date().toISOString();
+  if (isDemo()) {
+    const store = mem().founderProfiles;
+    const prior = store[userId] ?? EMPTY_FOUNDER_PROFILE;
+    store[userId] = { ...prior, brief: answers, briefAt: now };
+    return;
+  }
+  const sb = await supabaseServer();
+  await sb.from("users")
+    .update({ brief_answers: answers, brief_completed_at: now })
+    .eq("id", userId);
+}
+
+export async function getFounderProfile(userId: string): Promise<FounderProfile> {
+  if (isDemo()) return mem().founderProfiles[userId] ?? EMPTY_FOUNDER_PROFILE;
+  const sb = await supabaseServer();
+  const { data } = await sb
+    .from("users").select("profile_answers, profile_completed_at, brief_answers, brief_completed_at")
+    .eq("id", userId).maybeSingle();
+  if (!data) return EMPTY_FOUNDER_PROFILE;
+  return {
+    intake: data.profile_completed_at ? (data.profile_answers ?? {}) : null,
+    intakeAt: data.profile_completed_at ?? null,
+    brief: data.brief_completed_at ? (data.brief_answers ?? {}) : null,
+    briefAt: data.brief_completed_at ?? null,
+  };
 }
 
 export async function needsProfile(userId: string): Promise<boolean> {

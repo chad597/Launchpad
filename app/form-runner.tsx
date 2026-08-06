@@ -12,6 +12,7 @@ import { EMPTY_FORM_STATE, type FormState } from "@/lib/form-state";
 
 export function FormRunner({
   questions, action, submitLabel, pendingLabel, buttonClass = "btn", honeypot = false, footer,
+  initial,
 }: {
   questions: FormQuestion[];
   action: (state: FormState, formData: FormData) => Promise<FormState>;
@@ -20,8 +21,14 @@ export function FormRunner({
   buttonClass?: string;
   honeypot?: boolean;
   footer?: ReactNode;
+  // Answers we already hold, so nobody retypes what the program imported or
+  // what they filled in the last time they opened the form.
+  initial?: Record<string, unknown>;
 }) {
-  const [state, formAction, pending] = useActionState(action, EMPTY_FORM_STATE);
+  const [state, formAction, pending] = useActionState(
+    action,
+    initial ? { ...EMPTY_FORM_STATE, values: initial } : EMPTY_FORM_STATE
+  );
   const sections = groupBySection(questions);
 
   return (

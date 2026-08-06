@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/session";
+import { getFounderProfile, getForm, needsProfile } from "@/lib/forms";
 import {
   actionItemsForPairing, currentTime, getUser, messagesForPairing,
   meetingsForPairing, nextMeetingForPairing, noteForMeeting, pairingsForUser,
 } from "@/lib/data";
 import { markActionItem, postMessage, submitFounderHalf } from "../actions";
+import { AnswerList } from "../answers";
 import { BookMeeting } from "../book-meeting";
 import { Thread, type ThreadMessage } from "../thread";
 import { FounderHalfForm, type PriorItem } from "../note/note-forms";
@@ -18,13 +21,45 @@ function fmt(dt: string) {
 export default async function FounderHome({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; booked?: string }>;
+  searchParams: Promise<{ error?: string; booked?: string; intake?: string; briefed?: string }>;
 }) {
-  const { error, booked } = await searchParams;
+  const { error, booked, intake, briefed } = await searchParams;
   const user = await currentUser();
+  // The intake form is the whole founder side of matching, so it comes before
+  // anything else the app can show them.
+  if (await needsProfile(user.id)) redirect("/profile/setup");
   const pairing = (await pairingsForUser(user.id))[0];
+  const profile = await getFounderProfile(user.id);
+
   if (!pairing) {
-    return <div className="wrap"><h1 className="page">Welcome, {user.name}</h1><p className="sub">Your mentor match arrives in week 3. Until then, use Ask-A-Mentor and office hours.</p></div>;
+    const intakeForm = await getForm("founder-intake");
+    return (
+      <div className="wrap">
+        <h1 className="page">Welcome, {user.name.split(" ")[0]}</h1>
+        <p className="sub">
+          Your mentor match arrives in week 3. Until then, use Ask-A-Mentor and office hours.
+        </p>
+        {intake && <div className="banner ok">Thanks. Chad reads these when he makes the matches.</div>}
+        <div className="grid two">
+          <div className="card">
+            <h2>What we are matching on</h2>
+            <p className="meta" style={{ margin: "0 0 .8rem" }}>
+              Change anything that is out of date. Whoever we match you with reads all of it.
+            </p>
+            {intakeForm && <AnswerList questions={intakeForm.questions} answers={profile.intake} />}
+            <Link className="btn ghost" href="/profile/setup">Edit your answers</Link>
+          </div>
+          <div className="card">
+            <h2>Need something before week 3?</h2>
+            <p className="meta" style={{ margin: "0 0 .6rem" }}>
+              Quick question for any mentor? Post in Ask-A-Mentor. Want live time on one problem? Book office hours.
+            </p>
+            <a className="btn ghost" href="#">Ask-A-Mentor</a>{" "}
+            <a className="btn ghost" href="#">Office hours</a>
+          </div>
+        </div>
+      </div>
+    );
   }
   const [mentor, next, items, allMsgs, meetings, now] = await Promise.all([
     getUser(pairing.mentorId),
@@ -77,8 +112,21 @@ export default async function FounderHome({
       </p>
       {error && <div className="banner bad">{error}</div>}
       {booked && <div className="banner ok">Meeting booked. It is on both of your home screens now.</div>}
+      {intake && <div className="banner ok">Saved. {mentor.name.split(" ")[0]} sees the new version.</div>}
+      {briefed && <div className="banner ok">Your brief is with {mentor.name.split(" ")[0]}.</div>}
       <div className="grid two">
         <div>
+          {!profile.briefAt && (
+            <div className="card">
+              <h2>Brief {mentor.name.split(" ")[0]} before you meet</h2>
+              <p className="meta" style={{ margin: "0 0 .7rem" }}>
+                {mentor.name.split(" ")[0]} has your intake answers, which run about a paragraph. Ten
+                minutes of writing here means your first meeting starts at the real problem instead of
+                a recap of where you are.
+              </p>
+              <Link className="btn" href="/profile/brief">Write the brief</Link>
+            </div>
+          )}
           <div className="card">
             <h2>Conversation with {mentor.name}</h2>
             <p className="meta" style={{ margin: "0 0 .6rem" }}>
@@ -183,6 +231,15 @@ export default async function FounderHome({
             <p className="meta" style={{ margin: 0 }}>
               <b style={{ color: "var(--ink-soft)" }}>Why you were matched:</b> {pairing.matchRationale}
             </p>
+          </div>
+          <div className="card">
+            <h2>What {mentor.name.split(" ")[0]} reads</h2>
+            <p className="meta" style={{ margin: "0 0 .6rem" }}>
+              Your intake answers, and {profile.briefAt ? "the brief you wrote" : "the brief once you write it"}.
+              Both stay editable, and changes show up on their side straight away.
+            </p>
+            <Link className="btn ghost" href="/profile/setup">Your answers</Link>{" "}
+            <Link className="btn ghost" href="/profile/brief">Your brief</Link>
           </div>
           <div className="card">
             <h2>Your confidence, week by week</h2>

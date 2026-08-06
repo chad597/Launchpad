@@ -15,6 +15,9 @@ export const users: User[] = [
   { id: "u-priya", email: "priya@lucent.test", name: "Priya Nguyen", role: "founder", company: "Lucent Pay", stage: "Pre-revenue, B2B fintech" },
   { id: "u-marcusb", email: "marcus@okafor.test", name: "Ade Okafor", role: "founder", company: "Plotline", stage: "Idea stage, creator tools" },
   { id: "u-rosa", email: "rosa@marsh.test", name: "Rosa Marsh", role: "founder", company: "Kindling", stage: "First customers, B2B services" },
+  // In the cohort, no intake answers and no mentor yet, which is what every
+  // founder looks like in week 1.
+  { id: "u-nia", email: "nia@sagepath.test", name: "Nia Chambers", role: "founder", company: "Sagepath" },
   { id: "u-sam", email: "sam@mentor.test", name: "Sam Patel", role: "mentor", bio: "Founder, 2 exits", expertise: ["Marketplaces", "Customer discovery", "Early GTM"] },
   { id: "u-brooks", email: "brooks@mentor.test", name: "Casey Brooks", role: "mentor", bio: "SaaS operator", expertise: ["B2B sales", "Hiring"] },
   { id: "u-grant", email: "grant@mentor.test", name: "R. Grant", role: "mentor", bio: "3x founder", expertise: ["Validation", "Product"] },
@@ -171,3 +174,51 @@ export const matchSuggestions: MatchSuggestion[] = [
     status: "suggested",
   },
 ];
+
+// Founder intake and brief answers, so the mentor-facing view has something
+// to render when clicking through in demo mode. Alex has done both; the other
+// founders have done neither, which is the state the nudges are written for.
+export const DEMO_FOUNDER_PROFILES: Record<string, {
+  intake: Record<string, unknown> | null;
+  intakeAt: string | null;
+  brief: Record<string, unknown> | null;
+  briefAt: string | null;
+}> = {
+  "u-alex": {
+    intakeAt: "2026-07-20T14:00:00.000Z",
+    intake: {
+      phone: "864-555-0148",
+      company: "Trellis",
+      website: "https://trellis.test",
+      linkedin: "https://linkedin.com/in/alexrivera",
+      time_zone: "eastern",
+      availability: "Weekday mornings, and most of Thursday",
+      one_liner: "A booking marketplace that fills the empty hours at neighborhood gyms.",
+      industry: "consumer",
+      stage: "building",
+      team: "cofounders",
+      commitment: "full_time",
+      needs: ["first_customers", "pricing", "strategy"],
+      strengths: ["building_product"],
+      biggest_challenge:
+        "We have twelve gyms signed up and almost no bookings. I cannot tell whether the problem is that the gyms are wrong, the price is wrong, or that nobody knows we exist.",
+      win: "A repeatable way to get bookings that does not depend on me texting people, and enough revenue to prove it works.",
+      mentoring_format: "advisory",
+      industry_pref: "not_much",
+      ground_rules: true,
+      anything_else: "",
+    },
+    briefAt: "2026-07-27T16:30:00.000Z",
+    brief: {
+      traction: "12 gyms live, 34 bookings in six weeks, $410 of revenue. Two gyms have asked to be removed.",
+      recent_progress: "Rebuilt the booking flow, signed the first eight gyms, and ran a paid test that went nowhere.",
+      tried: "Instagram ads, $600 total, three bookings. Flyers at four gyms. A referral code nobody used.",
+      stuck: "Whether to keep selling to gyms or to go straight at the people who want the workout.",
+      decision: "My co-founder wants to niche down to climbing gyms only. I am not convinced.",
+      first_meeting: "A way to test the two-sided question in the next three weeks without rebuilding anything.",
+      candor: "direct",
+      context: "I left my job in March and have runway until about February.",
+      links: "https://trellis.test and the deck is in the shared drive.",
+    },
+  },
+};

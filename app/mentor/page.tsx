@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentUser, homeForRole } from "@/lib/session";
-import { needsProfile } from "@/lib/forms";
+import { getFounderProfile, getForm, needsProfile, type FounderProfile } from "@/lib/forms";
 import {
   currentTime, getUser, lastCompletedMeeting, meetingsForPairing, messagesForPairing,
   nextMeetingForPairing, noteForMeeting, pairingsForUser,
@@ -9,6 +9,7 @@ import {
 import { meetingRhythmDays } from "@/lib/health";
 import { bookingOptions } from "@/lib/availability";
 import { completeMentorHalf, postMessage } from "../actions";
+import { AnswerList } from "../answers";
 import { Thread, type ThreadMessage } from "../thread";
 import { BookMeeting } from "../book-meeting";
 import { MentorHalfForm } from "../note/note-forms";
@@ -34,6 +35,8 @@ interface PairView {
   thread: ThreadMessage[];
   // The meeting whose mentor half is still owed, if there is one.
   finishable: Meeting | null;
+  // What the founder said at intake, and the brief they wrote for this pair.
+  profile: FounderProfile;
 }
 
 export default async function MentorHome({
@@ -49,21 +52,27 @@ export default async function MentorHome({
   const pairs = await pairingsForUser(user.id);
   const now = await currentTime();
   const booking = bookingOptions(user.availability, now);
+  // Read once, then rendered per founder: what a founder was asked is the
+  // same for all of them.
+  const [intakeForm, briefForm] = await Promise.all([
+    getForm("founder-intake"), getForm("founder-brief"),
+  ]);
 
   const views: PairView[] = await Promise.all(
     pairs.map(async (p) => {
-      const [founder, next, last, meetings, msgs] = await Promise.all([
+      const [founder, next, last, meetings, msgs, profile] = await Promise.all([
         getUser(p.founderId),
         nextMeetingForPairing(p.id),
         lastCompletedMeeting(p.id),
         meetingsForPairing(p.id),
         messagesForPairing(p.id),
+        getFounderProfile(p.founderId),
       ]);
       const nextNote = next ? (await noteForMeeting(next.id)) ?? null : null;
       const lastNote = last ? (await noteForMeeting(last.id)) ?? null : null;
       const initials = (n: string) => n.split(" ").map((w) => w[0]).join("");
       return {
-        pairing: p, founder: founder!, next, nextNote, last, lastNote,
+        pairing: p, founder: founder!, next, nextNote, last, lastNote, profile,
         rhythmDays: meetingRhythmDays(meetings),
         // The founder half has to be in first: it is what the mentor reads
         // and responds to.
@@ -126,6 +135,41 @@ export default async function MentorHome({
                   {overdueDays > 1 && <span className="pill crit">Your half of the note is {overdueDays} days overdue</span>}
                 </div>
                 <hr className="divider" />
+
+                {/* Who they are and what they are stuck on, open until the
+                    first meeting has happened and folded away after that. */}
+                {(v.profile.intake || v.profile.brief) && (
+                  <details open={!v.last}>
+                    <summary style={{ cursor: "pointer", fontWeight: 700, fontSize: ".9rem" }}>
+                      About {v.founder.name.split(" ")[0]}
+                    </summary>
+                    <div style={{ marginTop: ".6rem" }}>
+                      {v.profile.brief && briefForm && (
+                        <>
+                          <p className="meta" style={{ margin: "0 0 .6rem" }}>
+                            Written for you before your first meeting.
+                          </p>
+                          <AnswerList questions={briefForm.questions} answers={v.profile.brief} />
+                          <hr className="divider" />
+                        </>
+                      )}
+                      {intakeForm && (
+                        <>
+                          <p className="meta" style={{ margin: "0 0 .6rem" }}>
+                            From the form they filled in when they joined the program.
+                          </p>
+                          <AnswerList questions={intakeForm.questions} answers={v.profile.intake} />
+                        </>
+                      )}
+                    </div>
+                  </details>
+                )}
+                {!v.profile.brief && (
+                  <p className="meta" style={{ margin: ".2rem 0 0" }}>
+                    {v.founder.name.split(" ")[0]} has not written their brief yet. It is the longer
+                    version of where they stand and what they want from you.
+                  </p>
+                )}
 
                 {/* What the founder wrote, so it is read before the meeting
                     without going anywhere. */}

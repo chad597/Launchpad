@@ -10,3 +10,6 @@ next-env.d.ts
 
 # Design handoff bundles are inputs, not source.
 *handoff.zip
+
+# Reference screenshots of the forms the app replaces.
+founder intake questions/

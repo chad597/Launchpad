@@ -6,6 +6,8 @@ import {
   messagesForPairing, noteForMeeting, openFlags, writeAudit,
 } from "@/lib/data";
 import { computePairHealth } from "@/lib/health";
+import { getFounderProfile, getForm } from "@/lib/forms";
+import { AnswerList } from "../../../answers";
 import type { MeetingNote } from "@/lib/types";
 
 const HEALTH_PILL = { healthy: "good", watch: "warn", attention: "crit" } as const;
@@ -49,9 +51,12 @@ export default async function PairingDetail({ params }: { params: Promise<{ id: 
   ]);
   if (!founder || !mentor) notFound();
 
-  const notes: (MeetingNote | undefined)[] = await Promise.all(
-    meetings.map((m) => noteForMeeting(m.id))
-  );
+  const [notes, profile, intakeForm, briefForm] = await Promise.all([
+    Promise.all(meetings.map((m) => noteForMeeting(m.id))) as Promise<(MeetingNote | undefined)[]>,
+    getFounderProfile(founder.id),
+    getForm("founder-intake"),
+    getForm("founder-brief"),
+  ]);
   const noteFor = new Map(meetings.map((m, i) => [m.id, notes[i]]));
   const health = computePairHealth({
     pairing, founder, mentor, meetings,
@@ -226,6 +231,28 @@ export default async function PairingDetail({ params }: { params: Promise<{ id: 
             <p className="meta" style={{ margin: "0 0 .4rem" }}>Founder · {founder.email}</p>
             {founder.company && <p style={{ fontSize: ".9rem", margin: "0 0 .2rem" }}>{founder.company}</p>}
             {founder.stage && <p className="meta" style={{ margin: 0 }}>{founder.stage}</p>}
+            {(profile.intake || profile.brief) && (
+              <>
+                <hr className="divider" />
+                <details>
+                  <summary style={{ cursor: "pointer", fontWeight: 700, fontSize: ".9rem" }}>
+                    What they told us
+                  </summary>
+                  <div style={{ marginTop: ".6rem" }}>
+                    {intakeForm && <AnswerList questions={intakeForm.questions} answers={profile.intake} />}
+                    {profile.brief && briefForm && (
+                      <>
+                        <hr className="divider" />
+                        <p className="meta" style={{ margin: "0 0 .6rem" }}>
+                          Brief written for {mentor.name.split(" ")[0]}.
+                        </p>
+                        <AnswerList questions={briefForm.questions} answers={profile.brief} />
+                      </>
+                    )}
+                  </div>
+                </details>
+              </>
+            )}
           </div>
 
           <div className="card">

@@ -75,6 +75,14 @@ export const SKILL_OPTIONS: QuestionOption[] = [
   { value: "other", label: "Something else" },
 ];
 
+export const TIME_ZONE_OPTIONS: QuestionOption[] = [
+  { value: "eastern", label: "Eastern" },
+  { value: "central", label: "Central" },
+  { value: "mountain", label: "Mountain" },
+  { value: "pacific", label: "Pacific" },
+  { value: "other", label: "Other" },
+];
+
 export const INDUSTRY_OPTIONS: QuestionOption[] = [
   { value: "software", label: "Software" },
   { value: "hardware_iot", label: "Hardware and IoT" },
@@ -135,11 +143,7 @@ export const DEFAULT_MENTOR_FORM: FormDefinition = {
     q({ key: "title", section: "About you", type: "short_text", label: "Title", required: false }),
     q({ key: "linkedin", section: "About you", type: "url", label: "LinkedIn URL", required: true }),
     q({ key: "time_zone", section: "About you", type: "dropdown", label: "Time zone", required: true,
-        options: [
-          { value: "eastern", label: "Eastern" }, { value: "central", label: "Central" },
-          { value: "mountain", label: "Mountain" }, { value: "pacific", label: "Pacific" },
-          { value: "other", label: "Other" },
-        ] }),
+        options: TIME_ZONE_OPTIONS }),
     q({ key: "years_experience", section: "About you", type: "dropdown", required: true,
         label: "How long have you been working in technology or startups?",
         options: [
