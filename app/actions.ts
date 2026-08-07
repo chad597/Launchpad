@@ -26,7 +26,7 @@ import { saveWeekly, weekStartOf } from "@/lib/weekly";
 import { buildShortlist } from "@/lib/matcher";
 import { assembleReport, composeFallback, narrativeInput } from "@/lib/report";
 import { saveNarrative } from "@/lib/report-store";
-import { GEMINI_MODEL, geminiConfigured, writeNarrative } from "@/lib/gemini";
+import { GEMINI_MODEL, geminiConfigured, polishRationales, writeNarrative } from "@/lib/gemini";
 
 // ---- auth ----
 
@@ -950,9 +950,23 @@ export async function suggestMatches(formData: FormData) {
   );
 
   const result = buildShortlist(founder, candidates, loads);
-  await data.replaceSuggestions(cohort.id, founderId, result.shortlist.map((e) => ({
+
+  // The polish pass: Gemini rewrites the composed scoring sentences into the
+  // paragraph both people read in their intro. Best effort — if it fails or
+  // no key is set, the composed prose stands, because a plain rationale
+  // beats a blocked matcher.
+  let rationales = result.shortlist.map((e) => e.rationale);
+  let polished = false;
+  if (geminiConfigured() && result.shortlist.length) {
+    const polish = await polishRationales(result.shortlist.map((e) => ({
+      founder: founder.name, mentor: e.mentor.name, sentences: e.rationale,
+    })));
+    if (polish.ok) { rationales = polish.rationales; polished = true; }
+  }
+
+  await data.replaceSuggestions(cohort.id, founderId, result.shortlist.map((e, i) => ({
     mentorId: e.mentor.id, score: e.score.total ?? 0, breakdown: e.breakdown,
-    rationale: e.rationale, rank: e.rank,
+    rationale: rationales[i], rank: e.rank,
   })));
 
   await data.writeAudit({
@@ -960,6 +974,7 @@ export async function suggestMatches(formData: FormData) {
     metadata: {
       founder: founder.name, considered: result.considered,
       excluded: result.excluded.length, shortlisted: result.shortlist.length,
+      rationales: polished ? GEMINI_MODEL : "composed",
     },
   });
   revalidatePath("/admin/matches");

@@ -80,9 +80,12 @@ export function geminiConfigured(): boolean {
   return !!process.env.GEMINI_API_KEY;
 }
 
-export async function writeNarrative(
-  input: unknown
-): Promise<{ ok: true; narrative: ReportNarrative } | { ok: false; reason: string }> {
+// One structured call: instructions + a JSON input, a JSON answer back in
+// the given schema. Both the report narrative and the match-rationale polish
+// go through here.
+async function geminiJson(
+  instructions: string, input: unknown, schema: object
+): Promise<{ ok: true; value: unknown } | { ok: false; reason: string }> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return { ok: false, reason: "GEMINI_API_KEY is not set" };
 
@@ -92,11 +95,11 @@ export async function writeNarrative(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: INSTRUCTIONS }] },
+        systemInstruction: { parts: [{ text: instructions }] },
         contents: [{ role: "user", parts: [{ text: JSON.stringify(input) }] }],
         generationConfig: {
           responseMimeType: "application/json",
-          responseSchema: NARRATIVE_SCHEMA,
+          responseSchema: schema,
           temperature: 0.4,
         },
       }),
@@ -111,10 +114,52 @@ export async function writeNarrative(
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (typeof text !== "string") return { ok: false, reason: "Gemini returned no text" };
   try {
-    const parsed = JSON.parse(text);
-    if (!validNarrative(parsed)) return { ok: false, reason: "Narrative did not match the expected shape" };
-    return { ok: true, narrative: parsed };
+    return { ok: true, value: JSON.parse(text) };
   } catch {
     return { ok: false, reason: "Gemini returned JSON that would not parse" };
   }
+}
+
+export async function writeNarrative(
+  input: unknown
+): Promise<{ ok: true; narrative: ReportNarrative } | { ok: false; reason: string }> {
+  const result = await geminiJson(INSTRUCTIONS, input, NARRATIVE_SCHEMA);
+  if (!result.ok) return result;
+  if (!validNarrative(result.value)) {
+    return { ok: false, reason: "Narrative did not match the expected shape" };
+  }
+  return { ok: true, narrative: result.value };
+}
+
+// The matcher's polish pass, the seam lib/matcher.ts left open. The composed
+// rationale is mechanically correct but reads like the scoring engine it
+// came from; both people read this text in their introduction, so it is
+// worth a rewrite. The model gets the sentences the scoring produced and
+// nothing else — same facts, better prose, never new claims.
+const RATIONALE_INSTRUCTIONS = `You are rewriting match rationales for a startup mentorship program. Each input item has a founder, a mentor, and factual sentences produced by a scoring engine about why they fit. Rewrite each into a short paragraph (2 to 3 sentences) that will be read by BOTH the founder and the mentor in their introduction email.
+
+Rules:
+- Use only facts in the given sentences. Never add skills, history, industries, or numbers that are not stated. If the sentences say there is not enough information, say that plainly.
+- Keep any caution the sentences contain; do not soften a real mismatch into praise.
+- Warm but plain. Active voice. Sentence case. No em dashes. No hype words.
+- Return one rewritten rationale per input item, in the same order.`;
+
+const RATIONALE_SCHEMA = {
+  type: "object",
+  properties: {
+    rationales: { type: "array", items: { type: "string" } },
+  },
+  required: ["rationales"],
+};
+
+export async function polishRationales(
+  items: { founder: string; mentor: string; sentences: string }[]
+): Promise<{ ok: true; rationales: string[] } | { ok: false; reason: string }> {
+  const result = await geminiJson(RATIONALE_INSTRUCTIONS, { items }, RATIONALE_SCHEMA);
+  if (!result.ok) return result;
+  const r = (result.value as { rationales?: unknown })?.rationales;
+  if (!Array.isArray(r) || r.length !== items.length || r.some((x) => typeof x !== "string" || !x.trim())) {
+    return { ok: false, reason: "Polish did not return one rationale per candidate" };
+  }
+  return { ok: true, rationales: r as string[] };
 }
