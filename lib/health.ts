@@ -65,13 +65,20 @@ export function computePairHealth(args: {
   let health: Health = "healthy";
   let signal = "Meeting and writing it up";
 
-  const unbookedDays = next ? 0 : lastMetDaysAgo ?? 99;
+  // A pair that has never met counts from the day they were matched, so a
+  // brand-new pairing starts healthy instead of looking years overdue, and a
+  // matched pair that never books anything still surfaces on the same clock.
+  const sinceMatched = Math.floor((now.getTime() - new Date(pairing.createdAt).getTime()) / dayMs);
+  const unbookedDays = next ? 0 : lastMetDaysAgo ?? Math.max(0, sinceMatched);
+  const noMeetingLabel = last ? "No next meeting" : "Matched, no first meeting booked";
   if (!next && unbookedDays >= 14) {
     health = "attention";
-    signal = `No next meeting, day ${unbookedDays}`;
+    signal = `${noMeetingLabel}, day ${unbookedDays}`;
   } else if (!next && unbookedDays >= 7) {
     health = "watch";
-    signal = `No next meeting, day ${unbookedDays} of 14`;
+    signal = `${noMeetingLabel}, day ${unbookedDays} of 14`;
+  } else if (!last) {
+    signal = next ? "First meeting booked" : "Just matched, nothing booked yet";
   }
 
   // Drift from their own rhythm. Measured to the next meeting when one is
@@ -101,7 +108,9 @@ export function computePairHealth(args: {
   const silentDays = lastMsg
     ? Math.floor((now.getTime() - new Date(lastMsg.createdAt).getTime()) / dayMs)
     : 99;
-  if (health === "attention" && silentDays >= 10) {
+  // Appended to any pair already flagged, not only the red ones: the silence
+  // is most useful when deciding whether a watch pair is actually drifting.
+  if (health !== "healthy" && silentDays >= 10) {
     signal += `, silent thread for ${silentDays} days`;
   }
 

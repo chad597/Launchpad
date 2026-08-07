@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { currentUser } from "@/lib/session";
-import { getFormForEditing } from "@/lib/forms";
+import { answeredKeys, getFormForEditing } from "@/lib/forms";
 import { QUESTION_TYPES } from "@/lib/mentor-form";
 import {
   createQuestion, editFormCopy, editQuestion, removeQuestion, reorderQuestion, restoreQuestion,
@@ -26,6 +26,10 @@ export default async function FormEditor({
   if (!form) notFound();
   const live = form.questions.filter((q) => !q.archived);
   const archived = form.questions.filter((q) => q.archived);
+  // Questions somebody has answered can be restored but never deleted for
+  // good: answers render from the form definition, so removing the question
+  // would hide them everywhere.
+  const answered = await answeredKeys(slug);
 
   return (
     <div className="wrap">
@@ -133,12 +137,16 @@ export default async function FormEditor({
                 <input type="hidden" name="id" value={q.id} />
                 <button className="linklike">Put it back</button>
               </form>
-              <form action={removeQuestion} className="inline-form">
-                <input type="hidden" name="slug" value={slug} />
-                <input type="hidden" name="id" value={q.id} />
-                <input type="hidden" name="permanent" value="yes" />
-                <button className="linklike">Delete for good</button>
-              </form>
+              {answered.has(q.key) ? (
+                <span className="meta">Has answers, so it stays here</span>
+              ) : (
+                <form action={removeQuestion} className="inline-form">
+                  <input type="hidden" name="slug" value={slug} />
+                  <input type="hidden" name="id" value={q.id} />
+                  <input type="hidden" name="permanent" value="yes" />
+                  <button className="linklike">Delete for good</button>
+                </form>
+              )}
             </div>
           ))}
         </div>

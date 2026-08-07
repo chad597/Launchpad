@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { currentUser } from "@/lib/session";
 import {
   actionItemsForPairing, currentTime, getMeeting, getPairing, getUser, meetingsForPairing,
-  noteForMeeting,
+  noteForMeeting, writeAudit,
 } from "@/lib/data";
 import { bookingOptions } from "@/lib/availability";
 import { completeMentorHalf, submitFounderHalf } from "../../actions";
@@ -47,6 +47,14 @@ export default async function NotePage({
       </div>
     );
   }
+  // Staff reads of a pair's private note are part of the who-knew-what-when
+  // record, the same as their conversation.
+  if (isStaff && !isMember) {
+    await writeAudit({
+      actorId: user.id, action: "note.read_by_staff", subjectType: "meeting",
+      subjectId: meeting.id, metadata: { founder: founder.name, mentor: mentor.name },
+    });
+  }
 
   const fs = note?.founderSection ?? null;
   const ms = note?.mentorSection ?? null;
@@ -75,7 +83,9 @@ export default async function NotePage({
     <div className="wrap narrow">
       <h1 className="page">1:1 meeting note · Week {meeting.weekNumber}</h1>
       <p className="sub">
-        {founder.name} ({founder.company}) with {mentor.name} · {fmt(meeting.scheduledAt)} · Both of you see this whole note. No surprises on either side.
+        {founder.name} ({founder.company}) with {mentor.name} · {fmt(meeting.scheduledAt)} · {isStaff && !isMember
+          ? "Staff view. This access is recorded in the audit log."
+          : "Both of you see this whole note. No surprises on either side."}
       </p>
       {canWriteFounderHalf ? (
         <FounderHalfForm

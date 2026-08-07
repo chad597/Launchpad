@@ -14,6 +14,7 @@ const LABEL: Record<string, string> = {
   "match.confirmed": "Confirmed a match",
   "flag.resolved": "Resolved a flag",
   "messages.read_by_staff": "Read a pair's conversation",
+  "note.read_by_staff": "Read a pair's meeting note",
 };
 
 function fmt(dt: string) {
