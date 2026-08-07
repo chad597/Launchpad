@@ -26,7 +26,7 @@ import { saveWeekly, weekStartOf } from "@/lib/weekly";
 import { buildShortlist } from "@/lib/matcher";
 import { assembleReport, composeFallback, narrativeInput } from "@/lib/report";
 import { saveNarrative } from "@/lib/report-store";
-import { geminiConfigured, writeNarrative } from "@/lib/gemini";
+import { GEMINI_MODEL, geminiConfigured, writeNarrative } from "@/lib/gemini";
 
 // ---- auth ----
 
@@ -984,7 +984,7 @@ export async function generateReportNarrative(formData: FormData) {
     if (!result.ok) {
       redirect(`/admin/report?week=${weekStart}&error=${encodeURIComponent(result.reason)}`);
     }
-    model = "gemini-2.5-flash";
+    model = GEMINI_MODEL;
     narrative = result.narrative;
   }
 

@@ -13,7 +13,7 @@
 // figure has nowhere to hide next to a real one.
 import { validNarrative, type ReportNarrative } from "./report";
 
-const MODEL = "gemini-2.5-flash";
+export const GEMINI_MODEL = "gemini-3.5-flash-lite";
 
 const NARRATIVE_SCHEMA = {
   type: "object",
@@ -87,7 +87,7 @@ export async function writeNarrative(
   if (!key) return { ok: false, reason: "GEMINI_API_KEY is not set" };
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
