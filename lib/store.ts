@@ -118,6 +118,34 @@ export function suggestionsForFounder(founderId: string): MatchSuggestion[] {
     .sort((a, b) => b.score - a.score);
 }
 
+// Active pairings per mentor across every cohort, because capacity is a
+// person's limit and not a cohort's.
+export function mentorLoads(): Map<string, number> {
+  const loads = new Map<string, number>();
+  for (const p of store().pairings) {
+    if (p.status === "active") loads.set(p.mentorId, (loads.get(p.mentorId) ?? 0) + 1);
+  }
+  return loads;
+}
+
+// A fresh matcher run replaces the founder's open shortlist. Selected and
+// rejected suggestions are history and stay put.
+export function replaceSuggestions(
+  founderId: string,
+  entries: { mentorId: string; score: number; breakdown: string[]; rationale: string }[]
+): void {
+  const s = store();
+  s.suggestions = s.suggestions.filter(
+    (x) => !(x.founderId === founderId && x.status === "suggested")
+  );
+  entries.forEach((e, i) => {
+    s.suggestions.push({
+      id: `s-${Date.now()}-${i}`, founderId, mentorId: e.mentorId,
+      score: e.score, breakdown: e.breakdown, rationale: e.rationale, status: "suggested",
+    });
+  });
+}
+
 export function nextMeetingForPairing(pairingId: string): Meeting | null {
   const t = now().toISOString();
   return (

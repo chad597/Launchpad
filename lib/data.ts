@@ -44,6 +44,19 @@ export async function openFlags(): Promise<Flag[]> {
 export async function suggestionsForFounder(founderId: string): Promise<MatchSuggestion[]> {
   return isDemo() ? demo.suggestionsForFounder(founderId) : db.suggestionsForFounder(founderId);
 }
+
+export async function mentorLoads(): Promise<Map<string, number>> {
+  return isDemo() ? demo.mentorLoads() : db.mentorLoads();
+}
+
+export async function replaceSuggestions(
+  cohortId: string, founderId: string,
+  entries: { mentorId: string; score: number; breakdown: string[]; rationale: string; rank: number }[]
+): Promise<void> {
+  return isDemo()
+    ? demo.replaceSuggestions(founderId, entries)
+    : db.replaceSuggestions(cohortId, founderId, entries);
+}
 export async function nextMeetingForPairing(id: string): Promise<Meeting | null> {
   return isDemo() ? demo.nextMeetingForPairing(id) : db.nextMeetingForPairing(id);
 }

@@ -12,6 +12,7 @@ const LABEL: Record<string, string> = {
   "pairing.created": "Created a pairing",
   "pairing.updated": "Updated a pairing",
   "match.confirmed": "Confirmed a match",
+  "match.suggested": "Ran the matcher for a founder",
   "flag.resolved": "Resolved a flag",
   "messages.read_by_staff": "Read a pair's conversation",
   "note.read_by_staff": "Read a pair's meeting note",

@@ -199,6 +199,35 @@ export async function suggestionsForFounder(founderId: string): Promise<MatchSug
   return (data ?? []).map(mapSuggestion);
 }
 
+// Active pairings per mentor across every cohort, because capacity is a
+// person's limit and not a cohort's.
+export async function mentorLoads(): Promise<Map<string, number>> {
+  const sb = await supabaseServer();
+  const { data } = await sb.from("pairings").select("mentor_id").eq("status", "active");
+  const loads = new Map<string, number>();
+  for (const r of (data ?? []) as any[]) {
+    loads.set(r.mentor_id, (loads.get(r.mentor_id) ?? 0) + 1);
+  }
+  return loads;
+}
+
+// A fresh matcher run replaces the founder's open shortlist. Selected and
+// rejected suggestions are history and stay put.
+export async function replaceSuggestions(
+  cohortId: string, founderId: string,
+  entries: { mentorId: string; score: number; breakdown: string[]; rationale: string; rank: number }[]
+): Promise<void> {
+  const sb = await supabaseServer();
+  await sb.from("match_suggestions").delete()
+    .eq("founder_id", founderId).eq("status", "suggested");
+  if (!entries.length) return;
+  await sb.from("match_suggestions").insert(entries.map((e) => ({
+    cohort_id: cohortId, founder_id: founderId, mentor_id: e.mentorId,
+    score: e.score, breakdown: e.breakdown, rationale: e.rationale,
+    rank: e.rank, status: "suggested",
+  })));
+}
+
 export async function nextMeetingForPairing(pairingId: string): Promise<Meeting | null> {
   const all = await meetingsForPairing(pairingId);
   const t = new Date().toISOString();

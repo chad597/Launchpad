@@ -2,8 +2,9 @@ import Link from "next/link";
 import { currentUser } from "@/lib/session";
 import {
   cohortMembers, getCohort, listCohorts, listPairings, listUsers, mentorPool, openFlags,
+  suggestionsForFounder,
 } from "@/lib/data";
-import { closeFlag } from "../../actions";
+import { closeFlag, selectMatch, suggestMatches } from "../../actions";
 import {
   BACKGROUND_LABELS, MENTOR_STAGE_LABELS, commitmentLabel, formatLabel, industryLabel,
   industryPrefLabel, scoreBand, scorePair, skillLabel,
@@ -126,13 +127,13 @@ interface Row {
 export default async function MatchReport({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; cohort?: string; only?: string }>;
+  searchParams: Promise<{ q?: string; cohort?: string; only?: string; suggest?: string }>;
 }) {
   const user = await currentUser();
   if (user.role !== "admin") {
     return <div className="wrap"><p className="meta">This view is for program admins.</p></div>;
   }
-  const { q = "", cohort: cohortParam, only } = await searchParams;
+  const { q = "", cohort: cohortParam, only, suggest } = await searchParams;
 
   const [cohorts, users, flags, active] = await Promise.all([
     listCohorts(), listUsers(), openFlags(), getCohort(),
@@ -195,7 +196,20 @@ export default async function MatchReport({
     .filter((f) => f && f.status !== "inactive" && !pairedFounderIds.has(f.id))
     .filter((f) => !needle || f.name.toLowerCase().includes(needle) || f.company?.toLowerCase().includes(needle));
 
-  const poolSize = new Set(pools.flat()).size;
+  // A matcher run for one unmatched founder: the persisted shortlist, plus
+  // the mentors the hard filter kept out, recomputed so the page can say who
+  // is missing and why rather than leave them silently absent.
+  const poolAll = new Set(pools.flat());
+  const suggestFounder = suggest ? byId.get(suggest) : undefined;
+  const shortlist = suggestFounder ? await suggestionsForFounder(suggestFounder.id) : [];
+  const topNeed = suggestFounder?.needs?.[0];
+  const excludedMentors = topNeed
+    ? users.filter((u) =>
+        u.role === "mentor" && u.status !== "inactive" &&
+        (poolAll.size === 0 || poolAll.has(u.id)) && u.avoidSkills?.includes(topNeed))
+    : [];
+
+  const poolSize = poolAll.size;
   const scoredRows = shown.filter((r) => r.score.total != null);
   const average = scoredRows.length
     ? Math.round(scoredRows.reduce((s, r) => s + (r.score.total as number), 0) / scoredRows.length)
@@ -388,6 +402,47 @@ export default async function MatchReport({
       </div>
 
       <h2 className="lp-heading" style={{ margin: "var(--lp-stack) 0 12px" }}>Founders without a mentor</h2>
+
+      {suggestFounder && pairedFounderIds.has(suggestFounder.id) && (
+        <div className="banner ok" style={{ marginBottom: "12px" }}>
+          {suggestFounder.name} is matched. The intro is on its way to both people.
+        </div>
+      )}
+      {suggestFounder && !pairedFounderIds.has(suggestFounder.id) && (
+        <div className="card" style={{ marginBottom: "12px" }}>
+          <h2>Shortlist for {suggestFounder.name}</h2>
+          <p className="meta" style={{ margin: "0 0 var(--lp-space-5)" }}>
+            {shortlist.length
+              ? `The best ${shortlist.length === 1 ? "candidate" : `${shortlist.length} candidates`} from the 1:1 pool, best first. Confirming sends the intro to both people, with the rationale below in it.`
+              : "The matcher found nobody to suggest. Check that the cohort has a 1:1 pool and that the intake forms are filled in."}
+          </p>
+          {shortlist.map((s, i) => {
+            const m = byId.get(s.mentorId);
+            return (
+              <div className={`shortlist${i === 0 ? " top" : ""}`} key={s.id}>
+                <div className="head">
+                  <b>{m?.name ?? "…"}</b>
+                  <span className="meta">{[m?.title, m?.company].filter(Boolean).join(", ")}</span>
+                  <span className="score">{s.score}</span>
+                </div>
+                <div>{s.breakdown.map((c) => <span className="chip" key={c}>{c}</span>)}</div>
+                <p className="rationale">{s.rationale}</p>
+                <form action={selectMatch} style={{ display: "inline" }}>
+                  <input type="hidden" name="suggestionId" value={s.id} />
+                  <button className={i === 0 ? "btn" : "btn ghost"}>Confirm match and send the intro</button>
+                </form>
+              </div>
+            );
+          })}
+          {excludedMentors.length > 0 && topNeed && (
+            <p className="meta" style={{ margin: "var(--lp-space-5) 0 0" }}>
+              Left out: {excludedMentors.map((m) => m.name).join(", ")} — would rather not be the
+              go-to for {skillLabel(topNeed).toLowerCase()}, which is {suggestFounder.name.split(" ")[0]}&rsquo;s number 1.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         {unmatched.length === 0 && (
           <p className="meta" style={{ margin: 0, padding: "var(--lp-card-pad-tight)" }}>
@@ -408,7 +463,12 @@ export default async function MatchReport({
               <div className="lp-small">{f.founderStage ? stageLabel(f.founderStage) : "Unknown"}</div>
             </div>
             <div className="lp-row-col">
-              <Link className="linklike" href="/admin/pairings">Pair them</Link>
+              <form action={suggestMatches} style={{ display: "inline" }}>
+                <input type="hidden" name="founderId" value={f.id} />
+                <button className="linklike">Find a mentor</button>
+              </form>
+              {" · "}
+              <Link className="linklike" href="/admin/pairings">Pair by hand</Link>
             </div>
           </div>
         ))}

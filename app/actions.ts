@@ -23,6 +23,7 @@ import {
 import type { FormState } from "@/lib/form-state";
 import { issueInvite, redeemInvite } from "@/lib/invites";
 import { saveWeekly, weekStartOf } from "@/lib/weekly";
+import { buildShortlist } from "@/lib/matcher";
 
 // ---- auth ----
 
@@ -922,6 +923,44 @@ export async function closeFlag(formData: FormData) {
   });
   revalidatePath("/admin");
   revalidatePath("/admin/matches");
+}
+
+// Run the matcher for one founder: the hard filter, the weighted score, and
+// a ranked shortlist of five written to match_suggestions. This only
+// suggests — confirming a match is a separate, human act.
+export async function suggestMatches(formData: FormData) {
+  const admin = await requireAdmin();
+  const founderId = String(formData.get("founderId"));
+  const founder = await data.getUser(founderId);
+  if (!founder || founder.role !== "founder") redirect("/admin/matches");
+
+  const cohort = await data.getCohort();
+  const [users, poolIds, loads] = await Promise.all([
+    data.listUsers(), data.mentorPool(cohort.id), data.mentorLoads(),
+  ]);
+  // The pool is the mentors who volunteered for 1:1 duty this cohort. Before
+  // the week 2 filter has been done the pool is empty, and the matcher falls
+  // back to every active mentor rather than refusing to run.
+  const poolSet = new Set(poolIds);
+  const candidates = users.filter(
+    (u) => u.role === "mentor" && u.status !== "inactive" && (poolSet.size === 0 || poolSet.has(u.id))
+  );
+
+  const result = buildShortlist(founder, candidates, loads);
+  await data.replaceSuggestions(cohort.id, founderId, result.shortlist.map((e) => ({
+    mentorId: e.mentor.id, score: e.score.total ?? 0, breakdown: e.breakdown,
+    rationale: e.rationale, rank: e.rank,
+  })));
+
+  await data.writeAudit({
+    actorId: admin.id, action: "match.suggested", subjectType: "user", subjectId: founderId,
+    metadata: {
+      founder: founder.name, considered: result.considered,
+      excluded: result.excluded.length, shortlisted: result.shortlist.length,
+    },
+  });
+  revalidatePath("/admin/matches");
+  redirect(`/admin/matches?suggest=${founderId}`);
 }
 
 export async function selectMatch(formData: FormData) {
