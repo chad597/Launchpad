@@ -328,3 +328,12 @@ input[type="checkbox"]{accent-color:var(--lp-accent); width:auto}
 .reasons li:last-child{border-bottom:0}
 .reasons .rname{flex:0 0 9.5rem; font-weight:var(--lp-weight-semibold); color:var(--lp-ink); font-size:var(--lp-size-meta)}
 .reasons .rval{flex:0 0 2.5rem; font-variant-numeric:tabular-nums; text-align:right; color:var(--lp-ink)}
+
+/* The consolidated report prints; nothing else is designed to. Chrome and
+   controls disappear, cards stop breaking across pages. */
+@media print{
+  nav, .adminnav, .no-print{display:none !important}
+  body{background:#fff}
+  .wrap{max-width:none; padding:0}
+  .card, .stat, .tablewrap{break-inside:avoid; box-shadow:none}
+}

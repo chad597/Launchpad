@@ -24,6 +24,9 @@ import type { FormState } from "@/lib/form-state";
 import { issueInvite, redeemInvite } from "@/lib/invites";
 import { saveWeekly, weekStartOf } from "@/lib/weekly";
 import { buildShortlist } from "@/lib/matcher";
+import { assembleReport, composeFallback, narrativeInput } from "@/lib/report";
+import { saveNarrative } from "@/lib/report-store";
+import { geminiConfigured, writeNarrative } from "@/lib/gemini";
 
 // ---- auth ----
 
@@ -961,6 +964,37 @@ export async function suggestMatches(formData: FormData) {
   });
   revalidatePath("/admin/matches");
   redirect(`/admin/matches?suggest=${founderId}`);
+}
+
+// Write (or rewrite) the consolidated report's narrative for one week. The
+// numbers on the page never come from here — they are computed at render
+// time — so regenerating can only ever change the prose.
+export async function generateReportNarrative(formData: FormData) {
+  const admin = await requireAdmin();
+  const weekStart = String(formData.get("weekStart"));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) redirect("/admin/report");
+
+  const cohort = await data.getCohort();
+  const facts = await assembleReport(cohort, weekStart, await data.currentTime());
+
+  let model = "composed";
+  let narrative = composeFallback(facts);
+  if (geminiConfigured()) {
+    const result = await writeNarrative(narrativeInput(facts));
+    if (!result.ok) {
+      redirect(`/admin/report?week=${weekStart}&error=${encodeURIComponent(result.reason)}`);
+    }
+    model = "gemini-2.5-flash";
+    narrative = result.narrative;
+  }
+
+  await saveNarrative(cohort.id, weekStart, narrative, model, admin.id);
+  await data.writeAudit({
+    actorId: admin.id, action: "report.generated", subjectType: "cohort", subjectId: cohort.id,
+    metadata: { weekStart, model, filed: facts.filed.length, founders: facts.founders.length },
+  });
+  revalidatePath("/admin/report");
+  redirect(`/admin/report?week=${weekStart}`);
 }
 
 export async function selectMatch(formData: FormData) {

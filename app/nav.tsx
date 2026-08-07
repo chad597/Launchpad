@@ -28,6 +28,7 @@ const TABS = {
     { href: "/admin/cohorts", label: "Cohorts" },
     { href: "/admin/pairings", label: "Pairings" },
     { href: "/admin/matches", label: "Match report" },
+    { href: "/admin/report", label: "Cohort report" },
     { href: "/admin/audit", label: "Audit log" },
   ],
 } as const;

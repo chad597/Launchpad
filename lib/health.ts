@@ -104,13 +104,15 @@ export function computePairHealth(args: {
     signal = "Meeting note incomplete";
   }
 
+  // Appended to any pair already flagged, not only the red ones: the silence
+  // is most useful when deciding whether a watch pair is actually drifting.
+  // A pair with no messages at all is skipped — silence is measured from a
+  // real message, not invented for a thread that never started.
   const lastMsg = messages[messages.length - 1];
   const silentDays = lastMsg
     ? Math.floor((now.getTime() - new Date(lastMsg.createdAt).getTime()) / dayMs)
-    : 99;
-  // Appended to any pair already flagged, not only the red ones: the silence
-  // is most useful when deciding whether a watch pair is actually drifting.
-  if (health !== "healthy" && silentDays >= 10) {
+    : null;
+  if (health !== "healthy" && silentDays !== null && silentDays >= 10) {
     signal += `, silent thread for ${silentDays} days`;
   }
 
