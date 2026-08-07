@@ -40,15 +40,19 @@ export default async function ApplicantDetail({ params }: { params: Promise<{ id
       {user.role === "admin" && app.status !== "accepted" && (
         <div className="card" style={{ marginTop: "1rem" }}>
           <h2>Decision</h2>
-          <form action={reviewApplicant}>
+          {/* The decision travels as a bound argument, one per button, not as
+              the submit button's name/value: the submitter's value did not
+              survive the action round-trip and a literal "null" landed in the
+              status column. */}
+          <form action={reviewApplicant.bind(null, "accepted")}>
             <input type="hidden" name="id" value={app.id} />
             <div className="formrow">
               <label htmlFor="note">Note, for the record</label>
               <input type="text" id="note" name="note" defaultValue={app.reviewNote ?? ""} />
             </div>
-            <button className="btn" name="status" value="accepted" type="submit">Accept as a mentor</button>{" "}
-            <button className="btn ghost" name="status" value="reviewing" type="submit">Mark as reviewing</button>{" "}
-            <button className="btn ghost" name="status" value="declined" type="submit">Decline</button>
+            <button className="btn" type="submit">Accept as a mentor</button>{" "}
+            <button className="btn ghost" formAction={reviewApplicant.bind(null, "reviewing")} type="submit">Mark as reviewing</button>{" "}
+            <button className="btn ghost" formAction={reviewApplicant.bind(null, "declined")} type="submit">Decline</button>
             <div className="notice">
               Accepting creates their mentor account with everything they told us already filled in. They complete the short profile form the first time they sign in.
             </div>

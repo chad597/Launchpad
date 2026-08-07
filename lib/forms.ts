@@ -304,10 +304,15 @@ export async function submitApplication(
   }
   const sb = await supabaseServer();
   const formId = await formIdFor(slug);
-  const { data } = await sb.from("mentor_applications").insert({
+  // No .select() on this insert: the applicant has no session, and asking
+  // for the row back runs it through the staff-only read policy, which
+  // aborts the whole insert. This exact combination silently broke the
+  // public form once; the id is not worth that.
+  const { error } = await sb.from("mentor_applications").insert({
     form_id: formId, name, email, phone, answers, status: "new",
-  }).select("id").maybeSingle();
-  return data?.id ?? "";
+  });
+  if (error) throw new Error(`Application could not be saved: ${error.message}`);
+  return "";
 }
 
 export async function listApplications(status?: string): Promise<Application[]> {

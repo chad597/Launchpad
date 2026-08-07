@@ -438,7 +438,17 @@ export async function submitMentorApplication(
   const a = answers as Record<string, string>;
   const name = [a.first_name, a.last_name].filter(Boolean).join(" ").trim() || "Applicant";
   const email = (a.email ?? "").toLowerCase();
-  const appId = await submitApplication("mentor-application", answers, name, email, a.phone ?? "");
+  // A failed save must never show the thank-you page: an applicant who
+  // believes they applied will not apply again.
+  let appId = "";
+  try {
+    appId = await submitApplication("mentor-application", answers, name, email, a.phone ?? "");
+  } catch {
+    return {
+      attempt: next, values: answers,
+      error: "Something went wrong saving your application. Nothing was lost from the form, so please press submit again.",
+    };
+  }
 
   // Best effort: a failed email must not lose the application.
   await emailApplicationReceived(email, a.first_name || name);
@@ -874,11 +884,19 @@ export async function editFormCopy(formData: FormData) {
 
 // ---- applicants ----
 
-export async function reviewApplicant(formData: FormData) {
+const APPLICATION_STATUSES = ["new", "reviewing", "accepted", "declined"] as const;
+
+export async function reviewApplicant(statusArg: string, formData: FormData) {
   const admin = await requireAdmin();
-  const id = String(formData.get("id"));
-  const status = String(formData.get("status")) as "new" | "reviewing" | "accepted" | "declined";
+  const id = String(formData.get("id") ?? "");
+  const status = statusArg as (typeof APPLICATION_STATUSES)[number];
   const note = String(formData.get("note") ?? "");
+  // The decision arrives as a bound argument because the submit button's
+  // name/value did not survive the action round-trip, which once wrote the
+  // literal string "null" into the status column. Only real statuses pass.
+  if (!id || !APPLICATION_STATUSES.includes(status)) {
+    redirect("/admin/applicants?error=That review did not include a valid status");
+  }
 
   const app = await getApplication(id);
   const firstName = String((app?.answers as Record<string, string>)?.first_name ?? app?.name ?? "there");
