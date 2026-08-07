@@ -11,7 +11,7 @@ import type { ImportRow } from "@/lib/csv";
 import {
   acceptApplicant, addQuestion, deleteQuestion, getApplication, getForm, listApplications,
   moveQuestion, saveFounderBrief, saveFounderIntake, saveMentorProfile, setApplicationStatus,
-  submitApplication, updateFormCopy, updateQuestion,
+  setFounderNeeds, submitApplication, updateFormCopy, updateQuestion,
 } from "@/lib/forms";
 import {
   emailAccepted, emailAdminNewApplication, emailApplicationReceived, emailDeclined, emailMatchIntro,
@@ -22,6 +22,7 @@ import {
 } from "@/lib/mentor-form";
 import type { FormState } from "@/lib/form-state";
 import { issueInvite, redeemInvite } from "@/lib/invites";
+import { saveWeekly, weekStartOf } from "@/lib/weekly";
 
 // ---- auth ----
 
@@ -500,6 +501,43 @@ export async function submitFounderBrief(
   redirect("/founder?briefed=1");
 }
 
+// The weekly update. Filing twice in the same week edits that week rather
+// than adding a second row, so the trend stays one point per week.
+export async function submitWeeklyUpdate(
+  state: FormState, formData: FormData
+): Promise<FormState> {
+  const next = state.attempt + 1;
+  const user = await currentUser();
+  if (user.role !== "founder") redirect(homeForRole(user.role));
+  const form = await getForm("founder-weekly");
+  if (!form) return { attempt: next, error: "This form is not available right now" };
+  const { answers, missing } = readAnswers(form.questions, formData);
+  if (missing.length) {
+    return { attempt: next, error: stillNeeded(missing), values: answers };
+  }
+
+  const [cohort, week, now] = await Promise.all([
+    data.getCohort(), data.weekNumber(), data.currentTime(),
+  ]);
+  await saveWeekly({
+    founderId: user.id,
+    cohortId: cohort.id === "none" ? null : cohort.id,
+    weekStart: weekStartOf(now),
+    weekNumber: week,
+    answers,
+  });
+
+  // A founder who re-ranks what they need help with has just changed the
+  // input matching runs on. Writing it back is the point of asking.
+  const reranked = answers.needs_changed;
+  if (Array.isArray(reranked) && reranked.length) {
+    await setFounderNeeds(user.id, reranked.map(String));
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/weekly?filed=1");
+}
+
 // ---- admin ----
 
 async function requireAdmin() {
@@ -797,9 +835,11 @@ export async function removeQuestion(formData: FormData) {
   const slug = String(formData.get("slug"));
   const id = String(formData.get("id"));
   const permanent = formData.get("permanent") === "yes";
-  await deleteQuestion(id, permanent);
+  // Asking for a permanent delete on an answered question archives it
+  // instead, so the log records what actually happened.
+  const outcome = await deleteQuestion(slug, id, permanent);
   await data.writeAudit({
-    actorId: admin.id, action: permanent ? "form.question_deleted" : "form.question_archived",
+    actorId: admin.id, action: outcome === "deleted" ? "form.question_deleted" : "form.question_archived",
     subjectType: "form", subjectId: slug, metadata: { id },
   });
   revalidatePath(`/admin/forms/${slug}`);
@@ -881,6 +921,7 @@ export async function closeFlag(formData: FormData) {
     actorId: user.id, action: "flag.resolved", subjectType: "flag", subjectId: id, metadata: {},
   });
   revalidatePath("/admin");
+  revalidatePath("/admin/matches");
 }
 
 export async function selectMatch(formData: FormData) {

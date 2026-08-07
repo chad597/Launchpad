@@ -230,6 +230,11 @@ export function setAvailability(userId: string, availability: string, capacity: 
   if (u) { u.availability = availability; u.capacity = capacity; }
 }
 
+export function setNeeds(userId: string, needs: string[]) {
+  const u = store().users.find((x) => x.id === userId);
+  if (u) u.needs = needs;
+}
+
 // ---- admin ----
 
 export function listUsers(): User[] {
@@ -313,6 +318,7 @@ export function createPairing(
   store().pairings.push({
     id: `p-${Date.now()}`, cohortId, founderId, mentorId,
     status: "active", declaredCadence: cadence, matchRationale: rationale,
+    createdAt: new Date().toISOString(),
   });
 }
 
@@ -377,6 +383,7 @@ export function confirmMatch(suggestionId: string): Pairing | null {
     status: "active",
     declaredCadence: "biweekly",
     matchRationale: sug.rationale,
+    createdAt: new Date().toISOString(),
   };
   s.pairings.push(created);
   return created;

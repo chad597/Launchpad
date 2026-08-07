@@ -8,7 +8,9 @@ import {
 } from "@/lib/data";
 import { meetingRhythmDays } from "@/lib/health";
 import { bookingOptions } from "@/lib/availability";
+import { weeklyForFounder, type WeeklyUpdate } from "@/lib/weekly";
 import { completeMentorHalf, postMessage } from "../actions";
+import { LatestWeek, WeeklyTrend } from "../weekly/weekly-trend";
 import { AnswerList } from "../answers";
 import { Thread, type ThreadMessage } from "../thread";
 import { BookMeeting } from "../book-meeting";
@@ -37,6 +39,8 @@ interface PairView {
   finishable: Meeting | null;
   // What the founder said at intake, and the brief they wrote for this pair.
   profile: FounderProfile;
+  // The weeks they have filed, newest first.
+  weekly: WeeklyUpdate[];
 }
 
 export default async function MentorHome({
@@ -60,19 +64,20 @@ export default async function MentorHome({
 
   const views: PairView[] = await Promise.all(
     pairs.map(async (p) => {
-      const [founder, next, last, meetings, msgs, profile] = await Promise.all([
+      const [founder, next, last, meetings, msgs, profile, weekly] = await Promise.all([
         getUser(p.founderId),
         nextMeetingForPairing(p.id),
         lastCompletedMeeting(p.id),
         meetingsForPairing(p.id),
         messagesForPairing(p.id),
         getFounderProfile(p.founderId),
+        weeklyForFounder(p.founderId, 6),
       ]);
       const nextNote = next ? (await noteForMeeting(next.id)) ?? null : null;
       const lastNote = last ? (await noteForMeeting(last.id)) ?? null : null;
       const initials = (n: string) => n.split(" ").map((w) => w[0]).join("");
       return {
-        pairing: p, founder: founder!, next, nextNote, last, lastNote, profile,
+        pairing: p, founder: founder!, next, nextNote, last, lastNote, profile, weekly,
         rhythmDays: meetingRhythmDays(meetings),
         // The founder half has to be in first: it is what the mentor reads
         // and responds to.
@@ -135,6 +140,26 @@ export default async function MentorHome({
                   {overdueDays > 1 && <span className="pill crit">Your half of the note is {overdueDays} days overdue</span>}
                 </div>
                 <hr className="divider" />
+
+                {/* Between meetings, this is the only thing that moves. It
+                    goes above the intake answers because it is this week and
+                    those are week one. */}
+                {v.weekly.length > 0 && (
+                  <details open>
+                    <summary style={{ cursor: "pointer", fontWeight: 700, fontSize: ".9rem" }}>
+                      {v.founder.name.split(" ")[0]}&rsquo;s week
+                    </summary>
+                    <div style={{ marginTop: ".6rem" }}>
+                      <LatestWeek update={v.weekly[0]} name={v.founder.name} />
+                      {v.weekly.length > 1 && (
+                        <>
+                          <hr className="divider" />
+                          <WeeklyTrend updates={v.weekly} limit={5} />
+                        </>
+                      )}
+                    </div>
+                  </details>
+                )}
 
                 {/* Who they are and what they are stuck on, open until the
                     first meeting has happened and folded away after that. */}

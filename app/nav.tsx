@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 const TABS = {
   founder: [
     { href: "/founder", label: "Home" },
+    { href: "/weekly", label: "Weekly update" },
     { href: "/meetings", label: "Meetings and notes" },
     { href: "/flag", label: "Tell the team" },
   ],
@@ -19,12 +20,14 @@ const TABS = {
   ],
   admin: [
     { href: "/admin", label: "Health board" },
+    { href: "/admin/weekly", label: "This week" },
     { href: "/admin/people", label: "People" },
     { href: "/admin/import", label: "Import" },
     { href: "/admin/applicants", label: "Applicants" },
     { href: "/admin/forms", label: "Forms" },
     { href: "/admin/cohorts", label: "Cohorts" },
     { href: "/admin/pairings", label: "Pairings" },
+    { href: "/admin/matches", label: "Match report" },
     { href: "/admin/audit", label: "Audit log" },
   ],
 } as const;

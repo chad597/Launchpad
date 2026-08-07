@@ -1,7 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import {
   emailMentorHalfOverdue, emailNoMeetingBooked, emailNoteDue, emailNoteShared,
+  emailWeeklyUpdateDue,
 } from "@/lib/email";
+import { weekStartLabel, weekStartOf } from "@/lib/weekly";
 
 // The reminder engine, run daily by Vercel cron.
 //
@@ -47,7 +49,7 @@ export async function GET(request: Request) {
 
   const { data: pairings } = await sb
     .from("pairings")
-    .select("id, founder_id, mentor_id, declared_cadence, founder:founder_id(id,name,email), mentor:mentor_id(id,name,email)")
+    .select("id, founder_id, mentor_id, declared_cadence, created_at, founder:founder_id(id,name,email), mentor:mentor_id(id,name,email)")
     .eq("status", "active");
 
   for (const p of (pairings ?? []) as any[]) {
@@ -113,24 +115,55 @@ export async function GET(request: Request) {
       }
     }
 
-    // 4. Nothing on the books. The strongest signal a pair is drifting.
-    if (!next && last) {
-      const daysSince = Math.floor((now - new Date(last.scheduled_at).getTime()) / day);
+    // 4. Nothing on the books. The strongest signal a pair is drifting. A
+    //    pair that has never met counts from the day they were matched, on
+    //    the same clock the health board uses, so the pair the board flags
+    //    is also the pair that gets the nudge.
+    if (!next) {
+      const anchor = last ? new Date(last.scheduled_at) : new Date(p.created_at);
+      const daysSince = Math.floor((now - anchor.getTime()) / day);
       if (daysSince >= 7) {
         const stage = daysSince >= 14 ? "d14" : "d7";
         const subj = `${p.id}:${stage}`;
         if (fresh("pair.no_meeting", subj)) {
           const a = await emailNoMeetingBooked({
             to: founder.email, userId: founder.id, firstName: founder.name.split(" ")[0],
-            otherName: mentor.name, daysSince,
+            otherName: mentor.name, daysSince, everMet: !!last,
           });
-          await emailNoMeetingBooked({
+          const b = await emailNoMeetingBooked({
             to: mentor.email, userId: mentor.id, firstName: mentor.name.split(" ")[0],
-            otherName: founder.name, daysSince,
+            otherName: founder.name, daysSince, everMet: !!last,
           });
-          if (a.ok) { await tag(sb, "pair.no_meeting", subj); sent.push(`no_meeting ${p.id}`); }
+          if (a.ok || b.ok) { await tag(sb, "pair.no_meeting", subj); sent.push(`no_meeting ${p.id}`); }
         }
       }
+    }
+  }
+
+  // 5. The weekly update, nudged once on Thursday and once on Sunday for the
+  //    week that is running out. A founder with no mentor yet still gets it:
+  //    the first two weeks of a cohort are exactly when nothing else reports.
+  const weekday = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" })).getDay();
+  if (weekday === 4 || weekday === 0) {
+    const weekStart = weekStartOf(new Date());
+    const { data: founders } = await sb
+      .from("users").select("id, name, email")
+      .eq("role", "founder").eq("status", "active");
+    const { data: thisWeek } = await sb
+      .from("weekly_updates").select("founder_id").eq("week_start", weekStart);
+    const filed = new Set((thisWeek ?? []).map((r: any) => r.founder_id));
+    const { data: everFiled } = await sb.from("weekly_updates").select("founder_id");
+    const hasFiledBefore = new Set((everFiled ?? []).map((r: any) => r.founder_id));
+
+    for (const f of (founders ?? []) as any[]) {
+      if (!f.email || filed.has(f.id)) continue;
+      const subj = `${f.id}:${weekStart}:${weekday === 4 ? "thu" : "sun"}`;
+      if (!fresh("weekly.due", subj)) continue;
+      const r = await emailWeeklyUpdateDue({
+        to: f.email, userId: f.id, firstName: f.name.split(" ")[0],
+        weekLabel: weekStartLabel(weekStart), filedBefore: hasFiledBefore.has(f.id),
+      });
+      if (r.ok) { await tag(sb, "weekly.due", subj); sent.push(`weekly ${f.email}`); }
     }
   }
 

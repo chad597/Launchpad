@@ -103,6 +103,17 @@ export function Field({ q, defaults }: { q: FormQuestion; defaults?: Record<stri
     );
   }
 
+  if (q.type === "number") {
+    // Not type="number": a spinner on a phone keypad is worse than a plain
+    // numeric keyboard, and an empty box has to stay a legitimate answer.
+    return (
+      <div className="formrow">{labelEl}
+        <input type="text" inputMode="numeric" pattern="[0-9]*[.,]?[0-9]*" id={id} name={q.key}
+          required={q.required} defaultValue={asText(prior)} style={{ maxWidth: "12rem" }} />
+      </div>
+    );
+  }
+
   const inputType = q.type === "email" ? "email" : q.type === "phone" ? "tel" : q.type === "url" ? "url" : "text";
   return (
     <div className="formrow">{labelEl}

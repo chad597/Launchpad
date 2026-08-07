@@ -6,6 +6,7 @@ import {
   actionItemsForPairing, currentTime, getUser, messagesForPairing,
   meetingsForPairing, nextMeetingForPairing, noteForMeeting, pairingsForUser,
 } from "@/lib/data";
+import { weekStartLabel, weekStartOf, weeklyForWeek } from "@/lib/weekly";
 import { markActionItem, postMessage, submitFounderHalf } from "../actions";
 import { AnswerList } from "../answers";
 import { BookMeeting } from "../book-meeting";
@@ -31,6 +32,25 @@ export default async function FounderHome({
   const pairing = (await pairingsForUser(user.id))[0];
   const profile = await getFounderProfile(user.id);
 
+  // The weekly update runs whether or not a founder has a mentor yet, because
+  // the first two weeks of a cohort are exactly when the program cannot see
+  // what anyone is doing.
+  const thisWeekStart = weekStartOf(await currentTime());
+  const filedThisWeek = await weeklyForWeek(user.id, thisWeekStart);
+  const weeklyCard = (
+    <div className="card">
+      <h2>{filedThisWeek ? "This week is filed" : "Your weekly update"}</h2>
+      <p className="meta" style={{ margin: "0 0 .7rem" }}>
+        {filedThisWeek
+          ? `You filed the week of ${weekStartLabel(thisWeekStart)}. Change an answer any time before Monday.`
+          : `Eleven questions and most of them are one click, with last week's numbers already filled in. It is how we see who needs help between meetings.`}
+      </p>
+      <Link className={filedThisWeek ? "btn ghost" : "btn"} href="/weekly">
+        {filedThisWeek ? "See what you filed" : "File this week"}
+      </Link>
+    </div>
+  );
+
   if (!pairing) {
     const intakeForm = await getForm("founder-intake");
     return (
@@ -41,13 +61,16 @@ export default async function FounderHome({
         </p>
         {intake && <div className="banner ok">Thanks. Chad reads these when he makes the matches.</div>}
         <div className="grid two">
-          <div className="card">
+          <div>
+            {weeklyCard}
+            <div className="card">
             <h2>What we are matching on</h2>
             <p className="meta" style={{ margin: "0 0 .8rem" }}>
               Change anything that is out of date. Whoever we match you with reads all of it.
             </p>
             {intakeForm && <AnswerList questions={intakeForm.questions} answers={profile.intake} />}
             <Link className="btn ghost" href="/profile/setup">Edit your answers</Link>
+            </div>
           </div>
           <div className="card">
             <h2>Need something before week 3?</h2>
@@ -116,6 +139,7 @@ export default async function FounderHome({
       {briefed && <div className="banner ok">Your brief is with {mentor.name.split(" ")[0]}.</div>}
       <div className="grid two">
         <div>
+          {!filedThisWeek && weeklyCard}
           {!profile.briefAt && (
             <div className="card">
               <h2>Brief {mentor.name.split(" ")[0]} before you meet</h2>

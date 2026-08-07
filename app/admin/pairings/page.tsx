@@ -4,6 +4,7 @@ import {
   cohortMembers, getCohort, listPairings, listUsers, meetingsForPairing, mentorPool,
 } from "@/lib/data";
 import { meetingRhythmDays } from "@/lib/health";
+import { scorePair, totalBand } from "@/lib/match";
 import { addPairing, changePairing } from "../../actions";
 
 const STATUSES = ["proposed", "active", "paused", "completed", "dissolved"] as const;
@@ -47,7 +48,8 @@ export default async function PairingsPage({
     <div className="wrap">
       <h1 className="page">Pairings · {cohort.name}</h1>
       <p className="sub">
-        Every pairing in this cohort, including ended ones. Dissolving a pairing keeps its whole history; it does not delete the record.
+        Every pairing in this cohort, including ended ones. Dissolving a pairing keeps its whole history; it does not delete the record.{" "}
+        <Link className="linklike" href="/admin/matches">The match report</Link> shows the answers behind each one.
       </p>
       {error && <div className="banner bad">{error}</div>}
       {unmatched.length > 0 && (
@@ -59,7 +61,7 @@ export default async function PairingsPage({
       <div className="tablewrap">
         <table className="board">
           <thead>
-            <tr><th>Founder</th><th>Mentor</th><th>How often they meet</th><th>Status</th><th></th><th></th></tr>
+            <tr><th>Founder</th><th>Mentor</th><th>How often they meet</th><th>Fit</th><th>Status</th><th></th><th></th></tr>
           </thead>
           <tbody>
             {pairings.map((p) => (
@@ -70,6 +72,19 @@ export default async function PairingsPage({
                   {rhythm.get(p.id) != null
                     ? `About every ${rhythm.get(p.id)} days`
                     : "Not enough meetings yet"}
+                </td>
+                <td>
+                  {(() => {
+                    const f = byId.get(p.founderId), m = byId.get(p.mentorId);
+                    if (!f || !m) return <span className="meta">—</span>;
+                    const s = scorePair(f, m, { mentorLoad: load.get(p.mentorId) ?? 1 });
+                    return (
+                      <Link className={`total ${totalBand(s.total)}`} style={{ fontSize: "var(--lp-size-body)", textDecoration: "none" }}
+                        href={`/admin/matches?q=${encodeURIComponent(f.name)}`}>
+                        {s.total ?? "—"}
+                      </Link>
+                    );
+                  })()}
                 </td>
                 <td><span className={`pill ${STATUS_PILL[p.status]}`}>{p.status}</span></td>
                 <td>

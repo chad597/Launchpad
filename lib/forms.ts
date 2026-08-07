@@ -9,7 +9,10 @@ import {
 import {
   DEFAULT_FOUNDER_BRIEF_FORM, DEFAULT_FOUNDER_INTAKE_FORM, founderStageLine,
 } from "./founder-form";
+import { DEFAULT_FOUNDER_WEEKLY_FORM } from "./weekly-form";
+import { weeklyAnsweredKeys } from "./weekly";
 import { DEMO_FOUNDER_PROFILES } from "./fixtures";
+import { setNeeds as demoSetNeeds } from "./store";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -52,6 +55,7 @@ function mem(): FormStore {
       forms: [
         structuredClone(DEFAULT_MENTOR_FORM), structuredClone(DEFAULT_PROFILE_FORM),
         structuredClone(DEFAULT_FOUNDER_INTAKE_FORM), structuredClone(DEFAULT_FOUNDER_BRIEF_FORM),
+        structuredClone(DEFAULT_FOUNDER_WEEKLY_FORM),
       ],
       applications: [],
       founderProfiles: structuredClone(DEMO_FOUNDER_PROFILES),
@@ -197,22 +201,77 @@ export async function moveQuestion(slug: string, id: string, direction: -1 | 1) 
   await sb.from("form_questions").update({ position: a.position }).eq("id", b.id);
 }
 
+// Every question key anyone has ever answered on this form. Answers render
+// from the live form definition, so deleting a question hides its answers
+// even though the jsonb survives; this is what keeps "Delete for good"
+// honest.
+export async function answeredKeys(slug: string): Promise<Set<string>> {
+  const keys = new Set<string>();
+  const collect = (answers: unknown) => {
+    if (!answers || typeof answers !== "object") return;
+    for (const [k, v] of Object.entries(answers as Record<string, unknown>)) {
+      if (v != null && v !== "" && !(Array.isArray(v) && v.length === 0)) keys.add(k);
+    }
+  };
+
+  if (slug === "founder-weekly") return weeklyAnsweredKeys();
+
+  if (isDemo()) {
+    if (slug === "mentor-application") {
+      for (const a of mem().applications) collect(a.answers);
+    } else if (slug === "founder-intake") {
+      for (const p of Object.values(mem().founderProfiles)) collect(p.intake);
+    } else if (slug === "founder-brief") {
+      for (const p of Object.values(mem().founderProfiles)) collect(p.brief);
+    }
+    // The demo never stores mentor profile answers, so that form stays freely
+    // deletable there.
+    return keys;
+  }
+
+  const sb = await supabaseServer();
+  if (slug === "mentor-application") {
+    const { data } = await sb.from("mentor_applications").select("answers");
+    for (const r of data ?? []) collect(r.answers);
+  } else if (slug === "mentor-profile" || slug === "founder-intake") {
+    const role = slug === "mentor-profile" ? "mentor" : "founder";
+    const { data } = await sb.from("users").select("profile_answers").eq("role", role);
+    for (const r of data ?? []) collect(r.profile_answers);
+  } else if (slug === "founder-brief") {
+    const { data } = await sb.from("users").select("brief_answers").eq("role", "founder");
+    for (const r of data ?? []) collect(r.brief_answers);
+  }
+  return keys;
+}
+
 // Archive by default: submitted answers stay readable. Only a question that
-// nothing has answered can be removed outright.
-export async function deleteQuestion(id: string, permanent: boolean) {
+// nothing has answered can be removed outright; a permanent delete of an
+// answered question falls back to archiving, and the return value says which
+// one actually happened.
+export async function deleteQuestion(
+  slug: string, id: string, permanent: boolean
+): Promise<"deleted" | "archived"> {
+  let outcome: "deleted" | "archived" = permanent ? "deleted" : "archived";
+  if (permanent) {
+    const form = await getFormForEditing(slug);
+    const key = form?.questions.find((q) => q.id === id)?.key;
+    if (key && (await answeredKeys(slug)).has(key)) outcome = "archived";
+  }
+
   if (isDemo()) {
     for (const f of mem().forms) {
       const i = f.questions.findIndex((x) => x.id === id);
       if (i >= 0) {
-        if (permanent) f.questions.splice(i, 1);
+        if (outcome === "deleted") f.questions.splice(i, 1);
         else f.questions[i].archived = true;
       }
     }
-    return;
+    return outcome;
   }
   const sb = await supabaseServer();
-  if (permanent) await sb.from("form_questions").delete().eq("id", id);
+  if (outcome === "deleted") await sb.from("form_questions").delete().eq("id", id);
   else await sb.from("form_questions").update({ archived: true }).eq("id", id);
+  return outcome;
 }
 
 export async function updateFormCopy(slug: string, patch: Partial<FormDefinition>) {
@@ -431,6 +490,23 @@ export async function saveFounderBrief(userId: string, answers: Record<string, u
   await sb.from("users")
     .update({ brief_answers: answers, brief_completed_at: now })
     .eq("id", userId);
+}
+
+// A founder re-ranks what they need help with on the weekly update. It has to
+// land on the column matching reads and in the intake answers their mentor
+// sees, or the two would disagree about what the founder asked for.
+export async function setFounderNeeds(userId: string, needs: string[]) {
+  if (isDemo()) {
+    demoSetNeeds(userId, needs);
+    const store = mem().founderProfiles;
+    const prior = store[userId];
+    if (prior?.intake) store[userId] = { ...prior, intake: { ...prior.intake, needs } };
+    return;
+  }
+  const sb = await supabaseServer();
+  const { data } = await sb.from("users").select("profile_answers").eq("id", userId).maybeSingle();
+  const answers = { ...((data?.profile_answers as Record<string, unknown>) ?? {}), needs };
+  await sb.from("users").update({ needs, profile_answers: answers }).eq("id", userId);
 }
 
 export async function getFounderProfile(userId: string): Promise<FounderProfile> {

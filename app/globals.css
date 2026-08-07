@@ -277,3 +277,54 @@ input[type="checkbox"]{accent-color:var(--lp-accent); width:auto}
 .qlabel{font-weight:var(--lp-weight-semibold); margin-top:var(--lp-space-3); color:var(--lp-ink)}
 .cell-clip{max-width:18rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .visually-hidden{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0}
+
+/* — match report. The criterion chips follow the same tonal rule as the
+     pills: quiet when a criterion is fine, strong when it deserves a look,
+     solid accent for the one or two that are actually weak. No hue does any
+     work here. — */
+.matchrow{border-bottom:1px solid var(--lp-rule)}
+.matchrow:last-child{border-bottom:0}
+.matchrow[open]{background:var(--lp-surface-sunk)}
+.matchrow > summary{display:flex; flex-wrap:wrap; align-items:center; gap:var(--lp-space-4) var(--lp-space-7);
+  padding:var(--lp-space-6) var(--lp-card-pad-tight); cursor:pointer; list-style:none}
+.matchrow > summary::-webkit-details-marker{display:none}
+.matchrow > summary::before{content:"+"; width:1ch; color:var(--lp-text-faint); font-size:var(--lp-size-small)}
+.matchrow[open] > summary::before{content:"–"}
+.matchrow > summary:hover{background:var(--lp-surface-sunk)}
+.matchrow .who-cell{flex:1 1 210px; min-width:0}
+.matchrow .who-cell b{font-size:var(--lp-size-body); font-weight:var(--lp-weight-semibold)}
+.matchrow .col{flex:0 0 auto}
+.matchrow .col-label{font-size:var(--lp-size-micro); color:var(--lp-text-faint)}
+.matchrow .body{padding:0 var(--lp-card-pad-tight) var(--lp-card-pad-tight)}
+.matchrow.needs-look > summary{background:var(--lp-accent-tint)}
+
+.total{font-variant-numeric:tabular-nums; font-weight:var(--lp-weight-bold); font-size:22px; letter-spacing:-0.02em}
+.total.weak{color:var(--lp-accent-ink)}
+.total.unknown{color:var(--lp-text-faint); font-weight:var(--lp-weight-regular)}
+
+.scorechips{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 var(--lp-space-5)}
+.scorechip{display:inline-flex; align-items:baseline; gap:6px; white-space:nowrap;
+  font-size:var(--lp-size-meta); padding:4px 10px; border-radius:var(--lp-radius-control-sm);
+  background:var(--lp-chip); color:var(--lp-chip-ink)}
+.scorechip .v{font-variant-numeric:tabular-nums; font-weight:var(--lp-weight-semibold); color:var(--lp-ink)}
+.scorechip.fair{background:var(--lp-chip-strong); color:var(--lp-ink)}
+.scorechip.fair .v{color:var(--lp-ink)}
+.scorechip.weak{background:var(--lp-accent); color:var(--lp-surface)}
+.scorechip.weak .v{color:var(--lp-surface)}
+.scorechip.unknown{background:none; border:1px dashed var(--lp-line-strong); color:var(--lp-text-faint)}
+.scorechip.unknown .v{color:var(--lp-text-faint); font-weight:var(--lp-weight-regular)}
+
+.facts{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:var(--lp-space-5) var(--lp-space-8); margin:0}
+.facts > div{min-width:0}
+.facts dt{font-size:var(--lp-size-meta); font-weight:var(--lp-weight-semibold); color:var(--lp-ink)}
+.facts dd{margin:2px 0 0; font-size:var(--lp-size-small); color:var(--lp-ink-2); text-wrap:pretty}
+.facts dd.empty{color:var(--lp-text-faint)}
+.facts.wide{grid-template-columns:1fr}
+
+.reasons{margin:0; padding:0; list-style:none}
+.reasons li{display:flex; gap:var(--lp-space-5); padding:var(--lp-space-4) 0; border-bottom:1px solid var(--lp-rule);
+  font-size:var(--lp-size-small); color:var(--lp-ink-2)}
+.reasons li:last-child{border-bottom:0}
+.reasons .rname{flex:0 0 9.5rem; font-weight:var(--lp-weight-semibold); color:var(--lp-ink); font-size:var(--lp-size-meta)}
+.reasons .rval{flex:0 0 2.5rem; font-variant-numeric:tabular-nums; text-align:right; color:var(--lp-ink)}

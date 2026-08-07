@@ -21,6 +21,41 @@ export interface User {
   // Set the first time someone redeems an invite link, so admins can see who
   // still needs one sent.
   passwordSetAt?: string;
+
+  // Everything below is an answer from one of the intake forms, copied onto
+  // the user record because matching reads it. The full answer set stays in
+  // profile_answers. Anything undefined means the question was never
+  // answered, which the match report shows as unknown rather than as zero.
+  phone?: string;
+  title?: string;
+  linkedin?: string;
+  website?: string;
+  timeZone?: string;
+  // Both sides: which worlds they have operated in. A founder's is stored as
+  // a one-element array so the two join the same way.
+  industries?: string[];
+  mentoringFormat?: string;
+
+  // Mentor answers
+  yearsExperience?: string;
+  background?: string[];
+  skills?: string[];        // ranked, strongest first
+  avoidSkills?: string[];
+  story?: string;
+  tracks?: string[];
+  stagePreference?: string;
+  conflicts?: string;
+  mentorMotivation?: string;
+
+  // Founder answers
+  founderStage?: string;
+  teamShape?: string;
+  timeCommitment?: string;
+  needs?: string[];         // ranked, most pressing first
+  strengths?: string[];
+  challenge?: string;
+  goal?: string;
+  industryPref?: string;
 }
 
 export interface AuditEntry {
@@ -50,6 +85,9 @@ export interface Pairing {
   status: PairingStatus;
   declaredCadence: "weekly" | "biweekly" | "monthly" | "as_needed";
   matchRationale: string;
+  // When the pair was matched. Health counts from here until they first meet,
+  // so a new pairing is not scored as if a meeting were years overdue.
+  createdAt: string;
 }
 
 export interface Meeting {

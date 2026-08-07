@@ -9,6 +9,7 @@ export type QuestionType =
   | "email"
   | "phone"
   | "url"
+  | "number"
   | "dropdown"
   | "multi_select"
   | "ranked_select"
@@ -21,6 +22,7 @@ export const QUESTION_TYPES: { value: QuestionType; label: string; note: string 
   { value: "email", label: "Email", note: "Validated" },
   { value: "phone", label: "Phone", note: "One line" },
   { value: "url", label: "Link", note: "Validated" },
+  { value: "number", label: "Number", note: "Digits only, and it can be left empty" },
   { value: "dropdown", label: "Pick one", note: "Dropdown of options" },
   { value: "multi_select", label: "Pick several", note: "Checkboxes" },
   { value: "ranked_select", label: "Pick and rank", note: "Ordered, strongest first" },

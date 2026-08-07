@@ -4,6 +4,8 @@ Launchpad Tech Ventures mentorship platform: mentor matching with human final sa
 
 Spec: see the living spec artifact (v1.5) — data model, cohort lifecycle, notification matrix, KPIs.
 
+**[docs/handbook.md](docs/handbook.md)** is the operator's guide: what each role sees, why the workflows are shaped the way they are, how health and matching are scored, who can see what, and where every route lives. Read it before changing a workflow.
+
 ## Running the demo
 
 The app currently runs in **demo mode**: all data is in-memory, seeded from `lib/fixtures.ts` (Greenville Cohort 7, week 4). No accounts or keys needed.

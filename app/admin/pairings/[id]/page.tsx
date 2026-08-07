@@ -2,10 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { currentUser } from "@/lib/session";
 import {
-  actionItemsForPairing, currentTime, getPairing, getUser, meetingsForPairing,
+  actionItemsForPairing, currentTime, getPairing, getUser, listPairings, meetingsForPairing,
   messagesForPairing, noteForMeeting, openFlags, writeAudit,
 } from "@/lib/data";
 import { computePairHealth } from "@/lib/health";
+import { scoreBand, scorePair, totalBand } from "@/lib/match";
+import { weeklyForFounder } from "@/lib/weekly";
+import { LatestWeek, WeeklyTrend } from "../../../weekly/weekly-trend";
 import { getFounderProfile, getForm } from "@/lib/forms";
 import { AnswerList } from "../../../answers";
 import type { MeetingNote } from "@/lib/types";
@@ -51,13 +54,23 @@ export default async function PairingDetail({ params }: { params: Promise<{ id: 
   ]);
   if (!founder || !mentor) notFound();
 
-  const [notes, profile, intakeForm, briefForm] = await Promise.all([
+  const [notes, profile, intakeForm, briefForm, weekly] = await Promise.all([
     Promise.all(meetings.map((m) => noteForMeeting(m.id))) as Promise<(MeetingNote | undefined)[]>,
     getFounderProfile(founder.id),
     getForm("founder-intake"),
     getForm("founder-brief"),
+    weeklyForFounder(founder.id, 8),
   ]);
   const noteFor = new Map(meetings.map((m, i) => [m.id, notes[i]]));
+
+  // How the two of them line up on paper, from the same scoring the match
+  // report runs. It sits under the rationale someone typed, not instead of it.
+  const cohortPairings = await listPairings(pairing.cohortId);
+  const mentorLoad = Math.max(
+    1,
+    cohortPairings.filter((p) => p.status === "active" && p.mentorId === pairing.mentorId).length
+  );
+  const fit = scorePair(founder, mentor, { mentorLoad });
   const health = computePairHealth({
     pairing, founder, mentor, meetings,
     notes: notes.filter(Boolean) as MeetingNote[], messages, now,
@@ -196,6 +209,23 @@ export default async function PairingDetail({ params }: { params: Promise<{ id: 
           </div>
 
           <div className="card">
+            <h2>{founder.name.split(" ")[0]}&rsquo;s weeks</h2>
+            <p className="meta" style={{ margin: "0 0 var(--lp-space-5)" }}>
+              What they filed between meetings. Read next to the notes, it shows whether the pair is
+              talking about what is actually happening.
+            </p>
+            {weekly.length === 0 ? (
+              <p className="meta" style={{ margin: 0 }}>No weekly updates filed yet.</p>
+            ) : (
+              <>
+                <LatestWeek update={weekly[0]} name={founder.name} />
+                <hr className="divider" />
+                <WeeklyTrend updates={weekly} />
+              </>
+            )}
+          </div>
+
+          <div className="card">
             <h2>Conversation</h2>
             <p className="meta" style={{ margin: "0 0 .6rem" }}>
               {messages.length} message{messages.length === 1 ? "" : "s"}. Both of them were told at onboarding that staff can read this.
@@ -223,6 +253,30 @@ export default async function PairingDetail({ params }: { params: Promise<{ id: 
             <h2>Why these two</h2>
             <p style={{ fontSize: ".9rem", margin: 0 }}>
               {pairing.matchRationale || "No rationale was recorded for this pairing."}
+            </p>
+            <hr className="divider" />
+            <div className="half-head" style={{ marginBottom: "var(--lp-space-5)" }}>
+              <span className={`total ${totalBand(fit.total)}`}>{fit.total ?? "—"}</span>
+              <span className="meta">
+                on their answers, from {fit.scored} of {fit.of} criteria
+              </span>
+            </div>
+            <div className="scorechips">
+              {fit.criteria.map((c) => (
+                <span key={c.key} className={`scorechip ${scoreBand(c.score)}`} title={c.note}>
+                  {c.label} <span className="v">{c.score == null ? "—" : c.score}</span>
+                </span>
+              ))}
+            </div>
+            {fit.warnings.length > 0 && (
+              <div className="banner bad" style={{ marginBottom: 0 }}>
+                {fit.warnings.map((w) => <div key={w}>{w}</div>)}
+              </div>
+            )}
+            <p className="meta" style={{ margin: 0 }}>
+              <Link className="linklike" href={`/admin/matches?q=${encodeURIComponent(founder.name)}`}>
+                See this in the match report
+              </Link>
             </p>
           </div>
 

@@ -18,7 +18,36 @@ function mapUser(r: any): User {
     availability: r.availability ?? undefined, bookingLink: r.booking_link ?? undefined,
     capacity: r.capacity ?? undefined, status: r.status ?? "active",
     passwordSetAt: r.password_set_at ?? undefined,
+
+    phone: r.phone ?? undefined, title: r.title ?? undefined,
+    linkedin: r.linkedin ?? undefined, website: r.website ?? undefined,
+    timeZone: r.time_zone ?? undefined,
+    industries: r.industries ?? undefined,
+    mentoringFormat: r.mentoring_format ?? undefined,
+
+    yearsExperience: r.years_experience ?? undefined,
+    background: r.background ?? undefined,
+    skills: asList(r.skills), avoidSkills: r.avoid_skills ?? undefined,
+    story: r.story ?? undefined, tracks: r.tracks ?? undefined,
+    stagePreference: r.stage_preference ?? undefined,
+    conflicts: r.conflicts ?? undefined,
+    mentorMotivation: r.mentor_motivation ?? undefined,
+
+    founderStage: r.founder_stage ?? undefined,
+    teamShape: r.team_shape ?? undefined,
+    timeCommitment: r.time_commitment ?? undefined,
+    needs: asList(r.needs), strengths: r.strengths ?? undefined,
+    challenge: r.challenge ?? undefined, goal: r.goal ?? undefined,
+    industryPref: r.industry_pref ?? undefined,
   };
+}
+
+// skills and needs are jsonb, so an unanswered question can arrive as null,
+// as [], or as something else entirely. Undefined means unanswered, which the
+// match report reports as unknown rather than scoring as zero.
+function asList(v: any): string[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  return v.map((x) => String(x));
 }
 
 function mapPairing(r: any): Pairing {
@@ -26,6 +55,7 @@ function mapPairing(r: any): Pairing {
     id: r.id, cohortId: r.cohort_id, founderId: r.founder_id, mentorId: r.mentor_id,
     status: r.status, declaredCadence: r.declared_cadence ?? "as_needed",
     matchRationale: r.match_rationale ?? "",
+    createdAt: r.created_at,
   };
 }
 

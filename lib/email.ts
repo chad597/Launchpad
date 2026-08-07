@@ -210,13 +210,35 @@ Your read, the risks you see, and what you agreed to next. Two minutes, and it c
 
 export async function emailNoMeetingBooked(args: {
   to: string; userId: string; firstName: string; otherName: string; daysSince: number;
+  // False for a pair that was matched but has never met, which changes what
+  // "it has been N days" is counting from.
+  everMet: boolean;
 }) {
   return sendEmail({
     to: args.to, userId: args.userId, type: "pair.no_meeting",
     subject: `Nothing on the calendar with ${args.otherName}`,
-    body: `${args.firstName}, it has been ${args.daysSince} days since you and ${args.otherName} last met, and there is nothing booked.
+    body: `${args.firstName}, ${args.everMet
+      ? `it has been ${args.daysSince} days since you and ${args.otherName} last met, and there is nothing booked.
 
-Getting the next one on the calendar is the single most useful thing either of you can do this week.`,
+Getting the next one on the calendar is the single most useful thing either of you can do this week.`
+      : `you and ${args.otherName} were matched ${args.daysSince} days ago and the first meeting is not booked yet.
+
+Getting it on the calendar is the single most useful thing either of you can do this week.`}`,
     cta: { label: "Book a meeting", href: `${SITE}/` },
+  });
+}
+
+export async function emailWeeklyUpdateDue(args: {
+  to: string; userId: string; firstName: string; weekLabel: string; filedBefore: boolean;
+}) {
+  return sendEmail({
+    to: args.to, userId: args.userId, type: "weekly.due",
+    subject: `Your week, in about two minutes`,
+    body: `${args.firstName}, the weekly update for the week of ${args.weekLabel} is still open.
+
+Eleven questions and nine of them are one click.${args.filedBefore ? " Last week's numbers are already in the boxes, so change what moved and leave the rest." : ""}
+
+It is how your mentor sees what happened between meetings, and it is what we read when we decide who needs help. A week where nothing moved is worth filing too.`,
+    cta: { label: "File this week", href: `${SITE}/weekly` },
   });
 }
